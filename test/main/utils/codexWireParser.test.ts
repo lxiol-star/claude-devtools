@@ -224,6 +224,33 @@ describe('codexWireParser / aggregateCodexEvents', () => {
       .find((b) => b.type === 'thinking') as { thinking: string } | undefined;
     expect(thinking).toBeDefined();
     // First line unwrapped; second line (inner emphasis) preserved verbatim.
-    expect(thinking!.thinking).toBe('Title one\nUses **bold** mid-sentence');
+    // Multiple summary entries join with a blank line (markdown paragraph break).
+    expect(thinking!.thinking).toBe('Title one\n\nUses **bold** mid-sentence');
+  });
+
+  it('joins multiple reasoning headlines as separate paragraphs, not one run-on line', () => {
+    const events: CodexTopLevelEvent[] = [
+      {
+        timestamp: TS,
+        type: 'response_item',
+        payload: {
+          type: 'reasoning',
+          summary: [
+            { type: 'summary_text', text: '**Implementing captcha with refresh and validation**' },
+            { type: 'summary_text', text: '**Refining brand layout and centering password dots**' },
+          ],
+        },
+      },
+    ];
+
+    const messages = aggregateCodexEvents(events);
+    const thinking = messages
+      .flatMap((m) => contentBlocks(m))
+      .find((b) => b.type === 'thinking') as { thinking: string } | undefined;
+    expect(thinking).toBeDefined();
+    // Two headlines separated by a blank line — NOT run together as one line.
+    expect(thinking!.thinking).toBe(
+      'Implementing captcha with refresh and validation\n\nRefining brand layout and centering password dots'
+    );
   });
 });

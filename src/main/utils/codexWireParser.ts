@@ -387,12 +387,17 @@ function buildReasoningMessage(
   },
   timestamp: Date
 ): ParsedMessage | null {
-  // Codex reasoning summaries are single headline lines wrapped in `**...**`
+  // Codex reasoning summaries are one-line headlines wrapped in `**...**`
   // (e.g. "**Planning resilient GitHub API calls**"). The full chain-of-thought
   // is in the sibling `encrypted_content` and cannot be decrypted, so these
-  // titles are all we have. Strip the bold wrapper so headers render as clean
-  // text instead of leaking literal asterisks.
-  const text = (item.summary?.map((s) => stripBoldWrapper(s.text)).join('\n') ?? '').trim();
+  // titles are all we have. A single reasoning event often carries MULTIPLE
+  // independent headlines (2-4). Strip each bold wrapper, then join with a
+  // blank line so markdown renders them as separate paragraphs instead of
+  // running them together (a single `\n` collapses to one line in markdown).
+  const titles = (item.summary ?? [])
+    .map((s) => stripBoldWrapper(s.text))
+    .filter((s) => s.length > 0);
+  const text = titles.join('\n\n').trim();
   if (!text) return null;
 
   return {
