@@ -181,4 +181,49 @@ describe('codexWireParser / aggregateCodexEvents', () => {
     // JSON object input is parsed as-is.
     expect(assistant!.toolCalls[0].input).toEqual({ cmd: 'ls' });
   });
+
+  it('strips the **...** bold wrapper from Codex reasoning headlines', () => {
+    const events: CodexTopLevelEvent[] = [
+      {
+        timestamp: TS,
+        type: 'response_item',
+        payload: {
+          type: 'reasoning',
+          summary: [{ type: 'summary_text', text: '**Planning resilient GitHub API calls**' }],
+        },
+      },
+    ];
+
+    const messages = aggregateCodexEvents(events);
+    const thinking = messages
+      .flatMap((m) => contentBlocks(m))
+      .find((b) => b.type === 'thinking');
+    expect(thinking).toBeDefined();
+    // Bold wrapper stripped; no literal asterisks leak into the header text.
+    expect((thinking as { thinking: string }).thinking).toBe('Planning resilient GitHub API calls');
+  });
+
+  it('keeps inner emphasis and multi-line reasoning intact', () => {
+    const events: CodexTopLevelEvent[] = [
+      {
+        timestamp: TS,
+        type: 'response_item',
+        payload: {
+          type: 'reasoning',
+          summary: [
+            { type: 'summary_text', text: '**Title one**' },
+            { type: 'summary_text', text: 'Uses **bold** mid-sentence' },
+          ],
+        },
+      },
+    ];
+
+    const messages = aggregateCodexEvents(events);
+    const thinking = messages
+      .flatMap((m) => contentBlocks(m))
+      .find((b) => b.type === 'thinking') as { thinking: string } | undefined;
+    expect(thinking).toBeDefined();
+    // First line unwrapped; second line (inner emphasis) preserved verbatim.
+    expect(thinking!.thinking).toBe('Title one\nUses **bold** mid-sentence');
+  });
 });

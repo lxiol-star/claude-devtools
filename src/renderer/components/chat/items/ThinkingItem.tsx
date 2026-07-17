@@ -40,6 +40,13 @@ export const ThinkingItem: React.FC<ThinkingItemProps> = React.memo(function Thi
   // Get token count from step.tokens.output or step.content.tokenCount
   const tokenCount = step.tokens?.output ?? step.content.tokenCount ?? 0;
 
+  // Some backends (notably Codex) only persist a short one-line reasoning
+  // headline — the full chain-of-thought is encrypted and unavailable. In that
+  // case the header already shows the entire content, so an expandable body
+  // would just repeat it. Suppress the redundant body + chevron when the header
+  // summary already contains everything.
+  const headerShowsEverything = truncatedPreview.trim() === fullContent.trim();
+
   return (
     <BaseItem
       icon={<Brain className="size-4" />}
@@ -48,11 +55,14 @@ export const ThinkingItem: React.FC<ThinkingItemProps> = React.memo(function Thi
       tokenCount={tokenCount}
       onClick={onClick}
       isExpanded={isExpanded}
+      hasExpandableContent={!headerShowsEverything}
       highlightClasses={highlightClasses}
       highlightStyle={highlightStyle}
       notificationDotColor={notificationDotColor}
     >
-      <MarkdownViewer content={fullContent} maxHeight="max-h-96" copyable />
+      {!headerShowsEverything && (
+        <MarkdownViewer content={fullContent} maxHeight="max-h-96" copyable />
+      )}
     </BaseItem>
   );
 });

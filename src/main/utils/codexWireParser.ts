@@ -366,6 +366,20 @@ function buildToolResultMessage(
   };
 }
 
+/**
+ * Strips a single surrounding `**...**` markdown-bold wrapper from a one-line
+ * Codex reasoning headline. Only unwraps when the entire trimmed line is bold
+ * (no inner `**`), so genuine emphasis inside longer text is left untouched.
+ */
+function stripBoldWrapper(text: string): string {
+  const trimmed = (text ?? '').trim();
+  const match = /^\*\*([^*][\s\S]*?)\*\*$/.exec(trimmed);
+  if (match && !match[1].includes('**')) {
+    return match[1].trim();
+  }
+  return trimmed;
+}
+
 function buildReasoningMessage(
   item: {
     summary?: { type: string; text: string }[];
@@ -373,7 +387,12 @@ function buildReasoningMessage(
   },
   timestamp: Date
 ): ParsedMessage | null {
-  const text = item.summary?.map((s) => s.text).join('\n') ?? '';
+  // Codex reasoning summaries are single headline lines wrapped in `**...**`
+  // (e.g. "**Planning resilient GitHub API calls**"). The full chain-of-thought
+  // is in the sibling `encrypted_content` and cannot be decrypted, so these
+  // titles are all we have. Strip the bold wrapper so headers render as clean
+  // text instead of leaking literal asterisks.
+  const text = (item.summary?.map((s) => stripBoldWrapper(s.text)).join('\n') ?? '').trim();
   if (!text) return null;
 
   return {
