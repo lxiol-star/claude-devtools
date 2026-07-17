@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@renderer/api';
+import { useT } from '@renderer/i18n';
 import {
   ChevronDown,
   Clipboard,
@@ -70,6 +71,7 @@ export const OpenInMenu = ({
   renderTrigger,
   variant = 'dots',
 }: OpenInMenuProps): React.JSX.Element => {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [targets, setTargets] = useState<OpenTarget[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -119,7 +121,7 @@ export const OpenInMenu = ({
         return;
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
-        const copy = targets.find((t) => t.id === 'copy-path');
+        const copy = targets.find((target) => target.id === 'copy-path');
         if (copy) {
           e.preventDefault();
           void dispatch(copy.id);
@@ -144,11 +146,11 @@ export const OpenInMenu = ({
   if (renderTrigger) {
     trigger = renderTrigger({ open, toggle: () => setOpen((v) => !v) });
   } else if (variant === 'iconMenu') {
-    const label = fileName ?? 'memory';
+    const label = fileName ?? t('memory.memoryFolderLabel');
     trigger = (
       <button
         type="button"
-        aria-label="Open in…"
+        aria-label={t('memory.openIn')}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
@@ -168,7 +170,7 @@ export const OpenInMenu = ({
     trigger = (
       <button
         type="button"
-        aria-label="Open in…"
+        aria-label={t('memory.openIn')}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
@@ -193,7 +195,7 @@ export const OpenInMenu = ({
           }}
         >
           {targets.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-text-muted">Detecting apps…</div>
+            <div className="px-3 py-2 text-xs text-text-muted">{t('memory.detectingApps')}</div>
           ) : (
             targets.map((target, idx) => {
               const isFirst = idx === 0;

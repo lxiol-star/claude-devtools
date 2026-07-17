@@ -8,6 +8,7 @@ import {
   TOOL_CALL_BORDER,
   TOOL_CALL_TEXT,
 } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { formatTokensCompact } from '@renderer/utils/formatters';
 import { format } from 'date-fns';
 import { ChevronRight, Layers, MailOpen } from 'lucide-react';
@@ -71,6 +72,7 @@ export const DisplayItemList = React.memo(function DisplayItemList({
   notificationColorMap,
   registerToolRef,
 }: Readonly<DisplayItemListProps>): React.JSX.Element {
+  const t = useT();
   // Reply-link highlight: when hovering a reply badge, dim everything except the linked pair
   const [replyLinkToolId, setReplyLinkToolId] = useState<string | null>(null);
 
@@ -90,7 +92,7 @@ export const DisplayItemList = React.memo(function DisplayItemList({
   if (!items || items.length === 0) {
     return (
       <div className="px-3 py-2 text-sm italic text-claude-dark-text-secondary">
-        No items to display
+        {t('chat.empty.noItems')}
       </div>
     );
   }
@@ -229,7 +231,7 @@ export const DisplayItemList = React.memo(function DisplayItemList({
             element = (
               <BaseItem
                 icon={<MailOpen className="size-4" />}
-                label="Input"
+                label={t('chat.input')}
                 summary={truncateText(inputContent, 80)}
                 tokenCount={inputTokenCount}
                 onClick={() => onItemClick(itemKey)}
@@ -267,7 +269,7 @@ export const DisplayItemList = React.memo(function DisplayItemList({
                     <Layers size={14} />
                   </div>
                   <span className="shrink-0 text-xs font-medium" style={{ color: TOOL_CALL_TEXT }}>
-                    Compacted
+                    {t('chat.compact.label')}
                   </span>
                   {item.tokenDelta && (
                     <span
@@ -278,7 +280,9 @@ export const DisplayItemList = React.memo(function DisplayItemList({
                       {formatTokensCompact(item.tokenDelta.postCompactionTokens)}
                       <span style={{ color: '#4ade80' }}>
                         {' '}
-                        ({formatTokensCompact(Math.abs(item.tokenDelta.delta))} freed)
+                        {t('chat.compact.freed', {
+                          tokens: formatTokensCompact(Math.abs(item.tokenDelta.delta)),
+                        })}
                       </span>
                     </span>
                   )}
@@ -289,7 +293,7 @@ export const DisplayItemList = React.memo(function DisplayItemList({
                       color: '#818cf8',
                     }}
                   >
-                    Phase {item.phaseNumber}
+                    {t('chat.phase', { number: item.phaseNumber })}
                   </span>
                   <span
                     className="ml-auto shrink-0 text-[11px]"

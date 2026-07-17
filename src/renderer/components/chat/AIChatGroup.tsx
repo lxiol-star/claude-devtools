@@ -115,7 +115,7 @@ function containsToolUseId(items: AIGroupDisplayItem[], toolUseId: string): bool
  *
  * Features:
  * - Card container with subtle zinc styling
- * - Clickable header with Bot icon, "Claude" label, and items summary
+ * - Clickable header with Bot icon, assistant label (Claude/Kimi/Codex per data backend), and items summary
  * - LastOutputDisplay: Always visible last output (text or tool result)
  * - DisplayItemList: Shows items when expanded with inline expansion support
  * - Manages local expansion state and inline item expansion
@@ -146,6 +146,30 @@ const AIChatGroupInner = ({
     if (!id) return false;
     return s.sessions.find((sess) => sess.id === id)?.isOngoing ?? false;
   });
+  // Resolve the backend that produced THIS session, not the globally-active
+  // context's backend. In aggregate ("All") mode the active context is 'local'
+  // (Claude) while the session may be Kimi/Codex, so keying off the global
+  // dataBackend mislabels cross-backend sessions. Prefer the session's own
+  // sourceBackend, then the tab's origin context, then the global fallback.
+  const sessionBackend = useStore((s) => {
+    const td = tabId ? s.tabSessionData[tabId] : null;
+    const detailBackend = (td?.sessionDetail ?? s.sessionDetail)?.session?.sourceBackend;
+    if (detailBackend) return detailBackend;
+    // Fall back to the origin context of the open tab (e.g. 'local-codex').
+    const tab = s.openTabs.find((t) => t.id === tabId);
+    const ctxId = tab?.contextId;
+    if (ctxId) {
+      const ctx = s.availableContexts.find((c) => c.id === ctxId);
+      if (ctx?.backend) return ctx.backend;
+      if (ctxId.startsWith('local-')) {
+        const suffix = ctxId.slice('local-'.length);
+        if (suffix === 'kimi' || suffix === 'codex' || suffix === 'claude') return suffix;
+      }
+    }
+    return s.dataBackend;
+  });
+  const assistantLabel =
+    sessionBackend === 'kimi' ? 'Kimi' : sessionBackend === 'codex' ? 'Codex' : 'Claude';
 
   // Per-tab session data subscriptions, falling back to global state
   const {
@@ -410,7 +434,7 @@ const AIChatGroupInner = ({
               className="shrink-0 text-xs font-semibold"
               style={{ color: COLOR_TEXT_SECONDARY }}
             >
-              Claude
+              {assistantLabel}
             </span>
 
             {/* Main agent model */}

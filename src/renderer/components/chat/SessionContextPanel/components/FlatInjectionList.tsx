@@ -8,6 +8,7 @@ import React, { useMemo } from 'react';
 
 import { CopyButton } from '@renderer/components/common/CopyButton';
 import { COLOR_TEXT_MUTED, COLOR_TEXT_SECONDARY } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 
 import { formatTokens } from '../utils/formatting';
 import { parseTurnIndex } from '../utils/pathParsing';
@@ -18,13 +19,20 @@ import type { ContextInjection } from '@renderer/types/contextInjection';
 // Constants
 // =============================================================================
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+/** Translate function shape accepted from the i18n hook. */
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
+const CATEGORY_COLORS: Record<
+  string,
+  { bg: string; text: string; labelKey?: string; label?: string }
+> = {
+  // 'CLAUDE.md' is a product file name — kept as a literal, not translated
   'claude-md': { bg: 'rgba(99, 102, 241, 0.15)', text: '#818cf8', label: 'CLAUDE.md' },
-  'mentioned-file': { bg: 'rgba(52, 211, 153, 0.15)', text: '#34d399', label: 'File' },
-  'tool-output': { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24', label: 'Tool' },
-  'thinking-text': { bg: 'rgba(167, 139, 250, 0.15)', text: '#a78bfa', label: 'Thinking' },
-  'task-coordination': { bg: 'rgba(251, 146, 60, 0.15)', text: '#fb923c', label: 'Team' },
-  'user-message': { bg: 'rgba(96, 165, 250, 0.15)', text: '#60a5fa', label: 'User' },
+  'mentioned-file': { bg: 'rgba(52, 211, 153, 0.15)', text: '#34d399', labelKey: 'chat.category.file' },
+  'tool-output': { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24', labelKey: 'chat.category.tool' },
+  'thinking-text': { bg: 'rgba(167, 139, 250, 0.15)', text: '#a78bfa', labelKey: 'chat.category.thinking' },
+  'task-coordination': { bg: 'rgba(251, 146, 60, 0.15)', text: '#fb923c', labelKey: 'chat.category.team' },
+  'user-message': { bg: 'rgba(96, 165, 250, 0.15)', text: '#60a5fa', labelKey: 'chat.category.user' },
 };
 
 // =============================================================================
@@ -55,7 +63,7 @@ interface FlatInjectionListProps {
 // Helpers
 // =============================================================================
 
-function flattenInjections(injections: ContextInjection[]): FlatRow[] {
+function flattenInjections(injections: ContextInjection[], t: Translate): FlatRow[] {
   const rows: FlatRow[] = [];
 
   for (const inj of injections) {
@@ -67,7 +75,7 @@ function flattenInjections(injections: ContextInjection[]): FlatRow[] {
               key: `${inj.id}-${tool.toolName}-${tool.toolUseId ?? rows.length}`,
               category: 'tool-output',
               label: tool.toolName,
-              description: `Turn ${inj.turnIndex + 1}`,
+              description: t('chat.turn', { turn: inj.turnIndex + 1 }),
               tokens: tool.tokenCount,
               turnIndex: inj.turnIndex,
               toolUseId: tool.toolUseId,
@@ -79,8 +87,11 @@ function flattenInjections(injections: ContextInjection[]): FlatRow[] {
           rows.push({
             key: inj.id,
             category: 'tool-output',
-            label: `${inj.toolCount} tool${inj.toolCount !== 1 ? 's' : ''}`,
-            description: `Turn ${inj.turnIndex + 1}`,
+            label:
+              inj.toolCount === 1
+                ? t('chat.tool.one', { count: inj.toolCount })
+                : t('chat.tool.other', { count: inj.toolCount }),
+            description: t('chat.turn', { turn: inj.turnIndex + 1 }),
             tokens: inj.estimatedTokens,
             turnIndex: inj.turnIndex,
             navigationType: 'turn',
@@ -93,8 +104,8 @@ function flattenInjections(injections: ContextInjection[]): FlatRow[] {
           rows.push({
             key: `${inj.id}-${item.type}`,
             category: 'thinking-text',
-            label: item.type === 'thinking' ? 'Thinking' : 'Text',
-            description: `Turn ${inj.turnIndex + 1}`,
+            label: item.type === 'thinking' ? t('chat.thinking') : t('chat.text'),
+            description: t('chat.turn', { turn: inj.turnIndex + 1 }),
             tokens: item.tokenCount,
             turnIndex: inj.turnIndex,
             navigationType: 'turn',
@@ -108,7 +119,7 @@ function flattenInjections(injections: ContextInjection[]): FlatRow[] {
             key: `${inj.id}-${item.type}-${item.label}`,
             category: 'task-coordination',
             label: item.toolName ?? item.label,
-            description: `Turn ${inj.turnIndex + 1}`,
+            description: t('chat.turn', { turn: inj.turnIndex + 1 }),
             tokens: item.tokenCount,
             turnIndex: inj.turnIndex,
             navigationType: 'turn',
@@ -169,7 +180,8 @@ export const FlatInjectionList = ({
   onNavigateToTool,
   onNavigateToUserGroup,
 }: Readonly<FlatInjectionListProps>): React.ReactElement => {
-  const rows = useMemo(() => flattenInjections(injections), [injections]);
+  const t = useT();
+  const rows = useMemo(() => flattenInjections(injections, t), [injections, t]);
 
   return (
     <div className="space-y-0.5">
@@ -177,8 +189,10 @@ export const FlatInjectionList = ({
         const categoryInfo = CATEGORY_COLORS[row.category] ?? {
           bg: 'rgba(161, 161, 170, 0.15)',
           text: '#a1a1aa',
-          label: row.category,
         };
+        const categoryLabel = categoryInfo.labelKey
+          ? t(categoryInfo.labelKey)
+          : (categoryInfo.label ?? row.category);
 
         const handleClick = (): void => {
           if (row.turnIndex < 0) return;
@@ -206,7 +220,7 @@ export const FlatInjectionList = ({
                 className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium"
                 style={{ backgroundColor: categoryInfo.bg, color: categoryInfo.text }}
               >
-                {categoryInfo.label}
+                {categoryLabel}
               </span>
               {/* Description */}
               <span
@@ -225,7 +239,7 @@ export const FlatInjectionList = ({
                     fontSize: '10px',
                   }}
                 >
-                  error
+                  {t('chat.errorBadge')}
                 </span>
               )}
               {/* Token count */}

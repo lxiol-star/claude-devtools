@@ -6,6 +6,8 @@
  * the rendered page. This card replaces that with a quiet, structured view.
  */
 
+import { useT } from '@renderer/i18n';
+
 import type { MemoryFrontmatter } from './frontmatter';
 
 interface FrontmatterCardProps {
@@ -15,6 +17,7 @@ interface FrontmatterCardProps {
 const ROW_LABEL_CLASS = 'shrink-0 text-[10px] uppercase tracking-wider text-text-muted';
 
 export const FrontmatterCard = ({ frontmatter }: FrontmatterCardProps): React.JSX.Element => {
+  const t = useT();
   const metadataEntries = Object.entries(frontmatter.metadata);
   return (
     <div
@@ -28,7 +31,7 @@ export const FrontmatterCard = ({ frontmatter }: FrontmatterCardProps): React.JS
       {frontmatter.name && (
         <div className="flex items-baseline gap-2">
           <span className={ROW_LABEL_CLASS} style={{ minWidth: '5rem' }}>
-            name
+            {t('memory.fieldName')}
           </span>
           <span className="font-mono text-[11px] text-text">{frontmatter.name}</span>
         </div>
@@ -36,7 +39,7 @@ export const FrontmatterCard = ({ frontmatter }: FrontmatterCardProps): React.JS
       {frontmatter.description && (
         <div className="mt-1 flex items-baseline gap-2">
           <span className={ROW_LABEL_CLASS} style={{ minWidth: '5rem' }}>
-            description
+            {t('memory.fieldDescription')}
           </span>
           <span className="text-text-secondary">{frontmatter.description}</span>
         </div>

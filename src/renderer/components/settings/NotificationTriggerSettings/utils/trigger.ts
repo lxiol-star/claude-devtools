@@ -15,71 +15,79 @@ export function generateId(): string {
 
 /**
  * Get available match fields based on content type and tool name.
+ * Labels are i18n keys resolved at render time.
  */
 export function getAvailableMatchFields(
   contentType: TriggerContentType,
   toolName?: string
-): { value: string; label: string }[] {
+): { value: string; labelKey: string }[] {
   if (contentType === 'tool_result') {
-    return [{ value: 'content', label: 'Content' }];
+    return [{ value: 'content', labelKey: 'settings.notifications.matchFieldOption.content' }];
   }
 
   if (contentType === 'thinking') {
-    return [{ value: 'thinking', label: 'Thinking Content' }];
+    return [
+      { value: 'thinking', labelKey: 'settings.notifications.matchFieldOption.thinkingContent' },
+    ];
   }
 
   if (contentType === 'text') {
-    return [{ value: 'text', label: 'Text Content' }];
+    return [{ value: 'text', labelKey: 'settings.notifications.matchFieldOption.textContent' }];
   }
 
   if (contentType === 'tool_use') {
     switch (toolName) {
       case 'Bash':
         return [
-          { value: 'command', label: 'Command' },
-          { value: 'description', label: 'Description' },
+          { value: 'command', labelKey: 'settings.notifications.matchFieldOption.command' },
+          { value: 'description', labelKey: 'settings.notifications.matchFieldOption.description' },
         ];
       case 'Task':
         return [
-          { value: 'description', label: 'Description' },
-          { value: 'prompt', label: 'Prompt' },
-          { value: 'subagent_type', label: 'Subagent Type' },
+          { value: 'description', labelKey: 'settings.notifications.matchFieldOption.description' },
+          { value: 'prompt', labelKey: 'settings.notifications.matchFieldOption.prompt' },
+          {
+            value: 'subagent_type',
+            labelKey: 'settings.notifications.matchFieldOption.subagentType',
+          },
         ];
       case 'Read':
       case 'Write':
-        return [{ value: 'file_path', label: 'File Path' }];
+        return [{ value: 'file_path', labelKey: 'settings.notifications.matchFieldOption.filePath' }];
       case 'Edit':
         return [
-          { value: 'file_path', label: 'File Path' },
-          { value: 'old_string', label: 'Old String' },
-          { value: 'new_string', label: 'New String' },
+          { value: 'file_path', labelKey: 'settings.notifications.matchFieldOption.filePath' },
+          { value: 'old_string', labelKey: 'settings.notifications.matchFieldOption.oldString' },
+          { value: 'new_string', labelKey: 'settings.notifications.matchFieldOption.newString' },
         ];
       case 'Glob':
         return [
-          { value: 'pattern', label: 'Pattern' },
-          { value: 'path', label: 'Path' },
+          { value: 'pattern', labelKey: 'settings.notifications.matchFieldOption.pattern' },
+          { value: 'path', labelKey: 'settings.notifications.matchFieldOption.path' },
         ];
       case 'Grep':
         return [
-          { value: 'pattern', label: 'Pattern' },
-          { value: 'path', label: 'Path' },
-          { value: 'glob', label: 'Glob Filter' },
+          { value: 'pattern', labelKey: 'settings.notifications.matchFieldOption.pattern' },
+          { value: 'path', labelKey: 'settings.notifications.matchFieldOption.path' },
+          { value: 'glob', labelKey: 'settings.notifications.matchFieldOption.globFilter' },
         ];
       case 'WebFetch':
         return [
-          { value: 'url', label: 'URL' },
-          { value: 'prompt', label: 'Prompt' },
+          { value: 'url', labelKey: 'settings.notifications.matchFieldOption.url' },
+          { value: 'prompt', labelKey: 'settings.notifications.matchFieldOption.prompt' },
         ];
       case 'WebSearch':
-        return [{ value: 'query', label: 'Query' }];
+        return [{ value: 'query', labelKey: 'settings.notifications.matchFieldOption.query' }];
       case 'Skill':
         return [
-          { value: 'skill', label: 'Skill Name' },
-          { value: 'args', label: 'Arguments' },
+          { value: 'skill', labelKey: 'settings.notifications.matchFieldOption.skillName' },
+          { value: 'args', labelKey: 'settings.notifications.matchFieldOption.arguments' },
         ];
       default:
         // "Any Tool" - match against the entire JSON-serialized input
-        return [{ value: '', label: 'Full Input (JSON)' }];
+        return [
+          { value: '', labelKey: 'settings.notifications.matchFieldOption.fullInputJson' },
+        ];
     }
   }
 

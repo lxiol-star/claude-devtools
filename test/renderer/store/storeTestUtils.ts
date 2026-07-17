@@ -5,6 +5,8 @@
 import { create } from 'zustand';
 
 import { createConfigSlice } from '../../../src/renderer/store/slices/configSlice';
+import { createConnectionSlice } from '../../../src/renderer/store/slices/connectionSlice';
+import { createContextSlice } from '../../../src/renderer/store/slices/contextSlice';
 import { createConversationSlice } from '../../../src/renderer/store/slices/conversationSlice';
 import { createMemorySlice } from '../../../src/renderer/store/slices/memorySlice';
 import { createNotificationSlice } from '../../../src/renderer/store/slices/notificationSlice';
@@ -38,6 +40,8 @@ export function createTestStore() {
     ...createUISlice(...args),
     ...createNotificationSlice(...args),
     ...createConfigSlice(...args),
+    ...createConnectionSlice(...args),
+    ...createContextSlice(...args),
     ...createMemorySlice(...args),
   }));
 }

@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
@@ -160,8 +161,32 @@ export function isValidEncodedPath(encodedName: string): boolean {
 }
 
 /**
+ * Validates a base64url-encoded project ID (used by Kimi Code and Codex backends).
+ * Accepts strings containing only the base64url alphabet and decodes to UTF-8.
+ *
+ * @param projectId - The project ID to validate
+ * @returns true if valid base64url project ID
+ */
+function isValidBase64UrlProjectId(projectId: string): boolean {
+  // Base64url alphabet (no padding). Length is unbounded to accommodate long paths.
+  if (!/^[A-Za-z0-9_-]+$/.test(projectId)) {
+    return false;
+  }
+
+  try {
+    const decoded = Buffer.from(projectId, 'base64url').toString('utf8');
+    return decoded.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Validates a project ID that may be either a plain encoded path or
  * a composite subproject ID (`{encodedPath}::{8-char-hex}`).
+ *
+ * Supports Claude Code dash-encoded paths (e.g. `-Users-wyj-project`) as well
+ * as Kimi Code / Codex base64url-encoded paths (e.g. `L1VzZXJzL3d5ai9wcm9qZWN0`).
  *
  * @param projectId - The project ID to validate
  * @returns true if valid
@@ -174,14 +199,17 @@ export function isValidProjectId(projectId: string): boolean {
   const sep = projectId.indexOf('::');
   if (sep === -1) {
     // Plain encoded path
-    return isValidEncodedPath(projectId);
+    return isValidEncodedPath(projectId) || isValidBase64UrlProjectId(projectId);
   }
 
   // Composite ID: validate base part and hash suffix
   const basePart = projectId.slice(0, sep);
   const hashPart = projectId.slice(sep + 2);
 
-  return isValidEncodedPath(basePart) && /^[a-f0-9]{8}$/.test(hashPart);
+  const validBase =
+    isValidEncodedPath(basePart) || isValidBase64UrlProjectId(basePart);
+
+  return validBase && /^[a-f0-9]{8}$/.test(hashPart);
 }
 
 /**
@@ -315,10 +343,27 @@ export function getClaudeBasePath(): string {
 }
 
 /**
- * Get the projects directory path (~/.claude/projects).
+ * Name of the sessions subdirectory under a data root.
+ * Claude Code stores sessions in `projects/`, while Kimi Code and Codex CLI
+ * both use `sessions/`.
+ */
+function resolveSessionsDirName(basePath: string): string {
+  if (fs.existsSync(path.join(basePath, 'projects'))) {
+    return 'projects';
+  }
+  if (fs.existsSync(path.join(basePath, 'sessions'))) {
+    return 'sessions';
+  }
+  // Default to the Claude Code layout when the root does not exist yet.
+  return 'projects';
+}
+
+/**
+ * Get the projects/sessions directory path (~/.claude/projects, ~/.kimi-code/sessions, ...).
  */
 export function getProjectsBasePath(): string {
-  return path.join(getClaudeBasePath(), 'projects');
+  const basePath = getClaudeBasePath();
+  return path.join(basePath, resolveSessionsDirName(basePath));
 }
 
 /**

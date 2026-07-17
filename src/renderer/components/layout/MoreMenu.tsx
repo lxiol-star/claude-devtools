@@ -8,6 +8,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@renderer/api';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { triggerDownload } from '@renderer/utils/sessionExporter';
 import { formatShortcut } from '@renderer/utils/stringUtils';
@@ -34,6 +35,7 @@ export const MoreMenu = ({
   activeTab,
   activeTabHasSession,
 }: Readonly<MoreMenuProps>): React.JSX.Element => {
+  const t = useT();
   const [isOpen, setIsOpen] = useState(false);
   const [buttonHover, setButtonHover] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -74,14 +76,17 @@ export const MoreMenu = ({
   const handleExport = useCallback(
     (format: ExportFormat) => {
       if (activeTab?.type !== 'session' || !activeTab.projectId || !activeTab.sessionId) return;
-      const { projectId, sessionId } = activeTab;
+      const { projectId, sessionId, contextId } = activeTab;
       setIsOpen(false);
       setExportLoading(true);
       // Re-fetch full detail (with chunks) since we strip them from the store to save memory.
       // No knownFingerprint passed, so the response is always SessionDetail | null
-      // at runtime. Narrow defensively for type safety.
-      void api
-        .getSessionDetail(projectId, sessionId)
+      // at runtime. Narrow defensively for type safety. In aggregate mode the
+      // tab carries its origin contextId — load from that context.
+      void (contextId
+        ? api.getSessionDetailByContext({ contextId, sessionId, projectId })
+        : api.getSessionDetail(projectId, sessionId)
+      )
         .then((response) => {
           if (response && !('unchanged' in response)) {
             triggerDownload(response, format);
@@ -100,7 +105,7 @@ export const MoreMenu = ({
   const topItems: MenuItem[] = [
     {
       id: 'search',
-      label: 'Search',
+      label: t('common.search'),
       icon: Search,
       shortcut: formatShortcut('K'),
       onClick: () => {
@@ -114,21 +119,21 @@ export const MoreMenu = ({
     ? [
         {
           id: 'export-md',
-          label: exportLoading ? 'Exporting…' : 'Export as Markdown',
+          label: exportLoading ? t('layout.exporting') : t('layout.exportAsMarkdown'),
           icon: FileText,
           shortcut: '.md',
           onClick: () => handleExport('markdown'),
         },
         {
           id: 'export-json',
-          label: exportLoading ? 'Exporting…' : 'Export as JSON',
+          label: exportLoading ? t('layout.exporting') : t('layout.exportAsJson'),
           icon: Braces,
           shortcut: '.json',
           onClick: () => handleExport('json'),
         },
         {
           id: 'export-txt',
-          label: exportLoading ? 'Exporting…' : 'Export as Plain Text',
+          label: exportLoading ? t('layout.exporting') : t('layout.exportAsPlainText'),
           icon: Type,
           shortcut: '.txt',
           onClick: () => handleExport('plaintext'),
@@ -139,7 +144,7 @@ export const MoreMenu = ({
   const bottomItems: MenuItem[] = [
     {
       id: 'settings',
-      label: 'Settings',
+      label: t('layout.settings'),
       icon: Settings,
       shortcut: formatShortcut(','),
       onClick: () => {
@@ -187,7 +192,7 @@ export const MoreMenu = ({
           color: buttonHover || isOpen ? 'var(--color-text)' : 'var(--color-text-muted)',
           backgroundColor: buttonHover || isOpen ? 'var(--color-surface-raised)' : 'transparent',
         }}
-        title="More actions"
+        title={t('layout.moreActions')}
       >
         <MoreHorizontal className="size-4" />
       </button>

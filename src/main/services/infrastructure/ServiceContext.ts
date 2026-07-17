@@ -11,6 +11,7 @@
  * - SSH context: remote ~/.claude/projects/ over SFTP
  */
 
+import { createBackend } from '@main/backends';
 import { ChunkBuilder } from '@main/services/analysis/ChunkBuilder';
 import { MemoryReader } from '@main/services/discovery/MemoryReader';
 import { ProjectScanner } from '@main/services/discovery/ProjectScanner';
@@ -22,11 +23,14 @@ import {
   MAX_CACHE_SESSIONS,
 } from '@shared/constants';
 import { createLogger } from '@shared/utils/logger';
+import * as path from 'path';
 
 import { DataCache } from './DataCache';
 import { FileWatcher } from './FileWatcher';
 
 import type { FileSystemProvider } from './FileSystemProvider';
+import type { DataBackend } from '@main/backends/DataBackend';
+import type { DataBackendName } from '@shared/types/api';
 
 const logger = createLogger('Infrastructure:ServiceContext');
 
@@ -44,6 +48,10 @@ export interface ServiceContextConfig {
   projectsDir?: string;
   /** Todos directory path (defaults to ~/.claude/todos) */
   todosDir?: string;
+  /** Optional display label for the context */
+  label?: string;
+  /** Optional backend identifier for local contexts (claude/kimi/codex) */
+  backend?: 'claude' | 'kimi' | 'codex';
 }
 
 /**
@@ -56,7 +64,8 @@ export interface ServiceContextConfig {
  * Lifecycle:
  * - Create: new ServiceContext(config)
  * - Start: context.start() — activates file watching and cache cleanup
- * - Pause: context.stopFileWatcher() — on context switch
+ * - Pause: context.stopFileWatcher() — on context switch (SSH contexts only;
+ *   local-type contexts keep watching so the aggregate "All" view stays live)
  * - Resume: context.startFileWatcher() — on context switch back
  * - Destroy: context.dispose() — cleans up all resources
  */
@@ -65,8 +74,14 @@ export class ServiceContext {
   readonly id: string;
   /** Context type */
   readonly type: 'local' | 'ssh';
+  /** Display label (if provided) */
+  readonly label?: string;
+  /** Backend identifier (if provided) */
+  readonly backendName?: DataBackendName;
   /** Filesystem provider */
   readonly fsProvider: FileSystemProvider;
+  /** Data backend for this context (Claude or Kimi) */
+  readonly backend: DataBackend;
 
   // Service instances
   readonly projectScanner: ProjectScanner;
@@ -83,6 +98,8 @@ export class ServiceContext {
   constructor(config: ServiceContextConfig) {
     this.id = config.id;
     this.type = config.type;
+    this.label = config.label;
+    this.backendName = config.backend;
     this.fsProvider = config.fsProvider;
 
     logger.info(`Creating ServiceContext: ${config.id} (${config.type})`);
@@ -90,15 +107,41 @@ export class ServiceContext {
     // Create services in dependency order
     const disableCache = process.env.CLAUDE_CONTEXT_DISABLE_CACHE === '1';
 
-    // 1. ProjectScanner - no dependencies (uses fsProvider directly)
+    // Derive root path from projectsDir (e.g. ~/.claude/projects -> ~/.claude).
+    // An empty rootPath makes detectBackend('') return null and ClaudeBackend
+    // fall back to the global getProjectsBasePath() — i.e. a secondary context
+    // would silently scan the primary backend's directory (the exact bug the
+    // dir-injection change fixed). Every real caller passes projectsDir, so
+    // this is a guard against regressions, not an expected path.
+    if (!config.projectsDir) {
+      logger.warn(
+        `ServiceContext "${config.id}" created without projectsDir; backend detection will fall back to the global default.`
+      );
+    }
+    const rootPath = config.projectsDir ? path.dirname(config.projectsDir) : '';
+
+    // 0. DataBackend - auto-detects Claude vs Kimi layout.
+    // Must receive the context's own dirs: without them ClaudeBackend falls back
+    // to the global getProjectsBasePath() (the primary root), which makes every
+    // secondary context silently scan the primary backend's directory.
+    this.backend = createBackend({
+      rootPath,
+      fsProvider: config.fsProvider,
+      projectsDir: config.projectsDir,
+      todosDir: config.todosDir,
+      backend: config.backend,
+    });
+
+    // 1. ProjectScanner - delegates discovery to the backend
     this.projectScanner = new ProjectScanner(
       config.projectsDir,
       config.todosDir,
-      config.fsProvider
+      config.fsProvider,
+      this.backend
     );
 
-    // 1b. MemoryReader - reads ~/.claude/projects/<id>/memory/
-    this.memoryReader = new MemoryReader(config.projectsDir, config.fsProvider);
+    // 1b. MemoryReader - reads per-project memory via the backend
+    this.memoryReader = new MemoryReader(config.projectsDir, config.fsProvider, this.backend);
 
     // 2. SessionParser - depends on ProjectScanner
     this.sessionParser = new SessionParser(this.projectScanner);

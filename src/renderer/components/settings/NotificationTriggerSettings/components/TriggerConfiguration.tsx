@@ -8,6 +8,7 @@ import {
   SELECT_INPUT_BASE,
   SELECT_OPTION_BG,
 } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { AlertCircle } from 'lucide-react';
 
 import { CONTENT_TYPE_OPTIONS, TOOL_NAME_OPTIONS } from '../utils/constants';
@@ -64,13 +65,14 @@ export const TriggerConfiguration = ({
   onTokenTypeChange,
   onColorChange,
 }: Readonly<TriggerConfigurationProps>): React.JSX.Element => {
+  const t = useT();
   const availableMatchFields = getAvailableMatchFields(trigger.contentType, trigger.toolName);
 
   return (
     <>
       {/* Section 1: General Info */}
       <div className="space-y-3">
-        <SectionHeader title="General Info" />
+        <SectionHeader title={t('settings.notifications.generalInfo')} />
 
         {/* Scope/Tool Name */}
         {(trigger.contentType === 'tool_use' || trigger.contentType === 'tool_result') && (
@@ -79,7 +81,7 @@ export const TriggerConfiguration = ({
               htmlFor={`trigger-${trigger.id}-tool-name`}
               className="text-sm text-text-secondary"
             >
-              Scope / Tool Name
+              {t('settings.notifications.scopeToolName')}
             </label>
             <select
               id={`trigger-${trigger.id}-tool-name`}
@@ -90,7 +92,7 @@ export const TriggerConfiguration = ({
             >
               {TOOL_NAME_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value} className={SELECT_OPTION_BG}>
-                  {option.label}
+                  {option.value === '' ? t('settings.notifications.anyTool') : option.label}
                 </option>
               ))}
             </select>
@@ -100,25 +102,25 @@ export const TriggerConfiguration = ({
 
       {/* Dot Color */}
       <div className="space-y-3">
-        <SectionHeader title="Dot Color" />
+        <SectionHeader title={t('settings.notifications.dotColor')} />
         <ColorPaletteSelector value={trigger.color} onChange={onColorChange} disabled={saving} />
       </div>
 
       {/* Section 2: Trigger Condition (Mode Selector) */}
       <div className="space-y-3">
-        <SectionHeader title="Trigger Condition" />
+        <SectionHeader title={t('settings.notifications.triggerCondition')} />
         <ModeSelector value={localMode} onChange={onModeChange} disabled={saving} />
       </div>
 
       {/* Section 3: Dynamic Configuration */}
       <div className="space-y-3">
-        <SectionHeader title="Configuration" />
+        <SectionHeader title={t('settings.notifications.configuration')} />
 
         {/* Error Status Mode */}
         {localMode === 'error_status' && (
           <div className="py-2">
             <p className="text-sm text-text-muted">
-              Triggers when a tool execution reports an error (is_error: true).
+              {t('settings.notifications.errorStatusDesc')}
             </p>
           </div>
         )}
@@ -132,7 +134,7 @@ export const TriggerConfiguration = ({
                 htmlFor={`trigger-${trigger.id}-content-type`}
                 className="text-sm text-text-secondary"
               >
-                Content Type
+                {t('settings.notifications.contentType')}
               </label>
               <select
                 id={`trigger-${trigger.id}-content-type`}
@@ -143,7 +145,7 @@ export const TriggerConfiguration = ({
               >
                 {CONTENT_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value} className={SELECT_OPTION_BG}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </option>
                 ))}
               </select>
@@ -186,7 +188,7 @@ export const TriggerConfiguration = ({
 interface ContentMatchConfigProps {
   triggerId: string;
   matchField?: string;
-  availableMatchFields: { value: string; label: string }[];
+  availableMatchFields: { value: string; labelKey: string }[];
   localPattern: string;
   patternError: string | null;
   saving: boolean;
@@ -206,6 +208,8 @@ const ContentMatchConfig = ({
   onPatternChange,
   onPatternBlur,
 }: Readonly<ContentMatchConfigProps>): React.JSX.Element => {
+  const t = useT();
+
   return (
     <div className="space-y-3">
       {/* Match Field */}
@@ -215,7 +219,7 @@ const ContentMatchConfig = ({
             htmlFor={`trigger-${triggerId}-match-field`}
             className="text-sm text-text-secondary"
           >
-            Match Field
+            {t('settings.notifications.matchField')}
           </label>
           <select
             id={`trigger-${triggerId}-match-field`}
@@ -226,7 +230,7 @@ const ContentMatchConfig = ({
           >
             {availableMatchFields.map((option) => (
               <option key={option.value} value={option.value} className={SELECT_OPTION_BG}>
-                {option.label}
+                {t(option.labelKey)}
               </option>
             ))}
           </select>
@@ -240,7 +244,7 @@ const ContentMatchConfig = ({
             htmlFor={`trigger-${triggerId}-match-pattern`}
             className="text-sm text-text-secondary"
           >
-            Match Pattern (Regex)
+            {t('settings.notifications.matchPattern')}
           </label>
         </div>
         <input
@@ -260,7 +264,7 @@ const ContentMatchConfig = ({
           </p>
         )}
         <p className="mt-1 text-xs text-text-muted">
-          Leave empty to match all content. Uses JavaScript regex syntax.
+          {t('settings.notifications.matchPatternHint')}
         </p>
       </div>
     </div>
@@ -290,11 +294,13 @@ const TokenThresholdConfig = ({
   onTokenThresholdChange,
   onTokenThresholdBlur,
 }: Readonly<TokenThresholdConfigProps>): React.JSX.Element => {
+  const t = useT();
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between border-b border-border-subtle py-2">
         <label htmlFor={`trigger-${triggerId}-token-type`} className="text-sm text-text-secondary">
-          Token Type
+          {t('settings.notifications.tokenType')}
         </label>
         <select
           id={`trigger-${triggerId}-token-type`}
@@ -304,22 +310,24 @@ const TokenThresholdConfig = ({
           className={`${SELECT_INPUT_BASE} ${getCursorClass(saving)}`}
         >
           <option value="total" className={SELECT_OPTION_BG}>
-            Total Tokens
+            {t('settings.notifications.tokenType.total')}
           </option>
           <option value="input" className={SELECT_OPTION_BG}>
-            Input Tokens
+            {t('settings.notifications.tokenType.input')}
           </option>
           <option value="output" className={SELECT_OPTION_BG}>
-            Output Tokens
+            {t('settings.notifications.tokenType.output')}
           </option>
         </select>
       </div>
       <div className="flex items-center justify-between border-b border-border-subtle py-2">
         <label htmlFor={`trigger-${triggerId}-threshold`} className="text-sm text-text-secondary">
-          Threshold
+          {t('settings.notifications.threshold')}
         </label>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">Alert if &gt;</span>
+          <span className="text-xs text-text-muted">
+            {t('settings.notifications.alertIfGreaterThan')}
+          </span>
           <input
             id={`trigger-${triggerId}-threshold`}
             type="text"
@@ -334,7 +342,7 @@ const TokenThresholdConfig = ({
             disabled={saving}
             className={`w-20 rounded border border-border bg-transparent px-2 py-1 text-right text-sm text-text focus:border-transparent focus:outline-none focus:ring-1 focus:ring-indigo-500 ${saving ? 'cursor-not-allowed opacity-50' : ''} `}
           />
-          <span className="text-xs text-text-muted">tokens</span>
+          <span className="text-xs text-text-muted">{t('settings.notifications.tokens')}</span>
         </div>
       </div>
     </div>

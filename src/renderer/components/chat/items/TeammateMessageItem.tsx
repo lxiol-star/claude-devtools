@@ -8,6 +8,7 @@ import {
   CARD_TEXT_LIGHT,
 } from '@renderer/constants/cssVariables';
 import { getTeamColorSet } from '@renderer/constants/teamColors';
+import { useT } from '@renderer/i18n';
 import { formatTokensCompact } from '@renderer/utils/formatters';
 import { ChevronRight, CornerDownLeft, MessageSquare, RefreshCw } from 'lucide-react';
 
@@ -39,19 +40,28 @@ const NOISE_TYPES = new Set([
   'shutdown_request',
 ]);
 
-/** Human-readable labels for noise message types */
-const NOISE_LABELS: Record<string, string> = {
-  idle_notification: 'Idle',
-  shutdown_approved: 'Shutdown confirmed',
-  teammate_terminated: 'Terminated',
-  shutdown_request: 'Shutdown requested',
+/** i18n keys for noise message types */
+const NOISE_LABEL_KEYS: Record<string, string> = {
+  idle_notification: 'chat.teammate.idle',
+  shutdown_approved: 'chat.subagent.shutdownConfirmed',
+  teammate_terminated: 'chat.teammate.terminated',
+  shutdown_request: 'chat.tool.shutdownRequested',
 };
+
+interface NoiseMatch {
+  /** Raw text from the message payload (data, not translated) */
+  text?: string;
+  /** i18n key for the known noise type label */
+  labelKey?: string;
+  /** Fallback raw type string */
+  rawType?: string;
+}
 
 /**
  * Detect operational noise in teammate message content.
- * Returns label if noise, null if real content.
+ * Returns a match descriptor if noise, null if real content.
  */
-function detectNoise(content: string, teammateId: string): string | null {
+function detectNoise(content: string, teammateId: string): NoiseMatch | null {
   // System messages are always noise
   if (teammateId === 'system') {
     const trimmed = content.trim();
@@ -59,13 +69,17 @@ function detectNoise(content: string, teammateId: string): string | null {
       try {
         const parsed = JSON.parse(trimmed) as { type?: string; message?: string };
         if (parsed.type && NOISE_TYPES.has(parsed.type)) {
-          return parsed.message ?? NOISE_LABELS[parsed.type] ?? parsed.type;
+          return {
+            text: parsed.message,
+            labelKey: NOISE_LABEL_KEYS[parsed.type],
+            rawType: parsed.type,
+          };
         }
       } catch {
         // Not JSON, fall through
       }
     }
-    return trimmed.length < 200 ? trimmed : null;
+    return trimmed.length < 200 ? { text: trimmed } : null;
   }
 
   // Non-system: check if content is a JSON operational message
@@ -74,7 +88,7 @@ function detectNoise(content: string, teammateId: string): string | null {
   try {
     const parsed = JSON.parse(trimmed) as { type?: string };
     if (parsed.type && NOISE_TYPES.has(parsed.type)) {
-      return NOISE_LABELS[parsed.type] ?? parsed.type;
+      return { labelKey: NOISE_LABEL_KEYS[parsed.type], rawType: parsed.type };
     }
   } catch {
     // Not JSON
@@ -124,13 +138,17 @@ export const TeammateMessageItem: React.FC<TeammateMessageItemProps> = ({
   highlightClasses = '',
   highlightStyle,
 }) => {
+  const t = useT();
   const colors = getTeamColorSet(teammateMessage.color);
 
   // Detect operational noise
-  const noiseLabel = useMemo(
+  const noise = useMemo(
     () => detectNoise(teammateMessage.content, teammateMessage.teammateId),
     [teammateMessage.content, teammateMessage.teammateId]
   );
+  const noiseLabel = noise
+    ? (noise.text ?? (noise.labelKey ? t(noise.labelKey) : (noise.rawType ?? null)))
+    : null;
 
   // Detect resent/duplicate messages
   const isResend = useMemo(() => isResendMessage(teammateMessage), [teammateMessage]);
@@ -206,7 +224,7 @@ export const TeammateMessageItem: React.FC<TeammateMessageItemProps> = ({
 
         {/* "Message" type label — parallels SubagentItem's model info */}
         <span className="text-[10px] uppercase tracking-wide" style={{ color: CARD_ICON_MUTED }}>
-          Message
+          {t('chat.teammate.messageLabel')}
         </span>
 
         {/* Reply indicator — shows which SendMessage triggered this response */}
@@ -232,13 +250,13 @@ export const TeammateMessageItem: React.FC<TeammateMessageItemProps> = ({
             style={{ color: CARD_ICON_MUTED }}
           >
             <RefreshCw className="size-2.5" />
-            Resent
+            {t('chat.teammate.resent')}
           </span>
         )}
 
         {/* Summary */}
         <span className="flex-1 truncate text-xs" style={{ color: CARD_TEXT_LIGHT }}>
-          {truncatedSummary || 'Teammate message'}
+          {truncatedSummary || t('chat.teammate.fallback')}
         </span>
 
         {/* Context impact — tokens injected into main session */}
@@ -247,7 +265,7 @@ export const TeammateMessageItem: React.FC<TeammateMessageItemProps> = ({
             className="shrink-0 font-mono text-[11px] tabular-nums"
             style={{ color: CARD_ICON_MUTED }}
           >
-            ~{formatTokensCompact(teammateMessage.tokenCount)} tokens
+            {t('chat.tokens', { count: formatTokensCompact(teammateMessage.tokenCount) })}
           </span>
         )}
       </div>

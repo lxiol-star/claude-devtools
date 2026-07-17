@@ -6,6 +6,8 @@ import { api } from '@renderer/api';
 
 import { getSessionResetState } from '../utils/stateResetHelpers';
 
+import { isAggregateSourceMode } from './contextSlice';
+
 import type { AppState } from '../types';
 import type { Project, Session } from '@renderer/types/data';
 import type { StateCreator } from 'zustand';
@@ -51,7 +53,10 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   fetchProjects: async () => {
     set({ projectsLoading: true, projectsError: null });
     try {
-      const projects = await api.getProjects();
+      // Aggregate ("All") mode merges projects across all local backends.
+      const projects = isAggregateSourceMode(get())
+        ? await api.getAllProjects()
+        : await api.getProjects();
       // Sort by most recent session (descending)
       const sorted = [...projects].sort(
         (a, b) => (b.mostRecentSession ?? 0) - (a.mostRecentSession ?? 0)
@@ -67,7 +72,12 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
 
   // Select a project and fetch its sessions (paginated)
   selectProject: (id: string) => {
-    const cached = get()._sessionCache.get(id);
+    // Cache key includes the source filter so All-mode and single-mode session
+    // lists for the same project never poison each other. In aggregate mode the
+    // cached list is the full merged set (source chip filters client-side), so
+    // it keys under 'all' to match how fetchSessionsInitial stores it.
+    const cacheKey = `${isAggregateSourceMode(get()) ? 'all' : get().sourceFilter}:${id}`;
+    const cached = get()._sessionCache.get(cacheKey);
 
     if (cached) {
       set({
@@ -85,7 +95,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         sessionDetailError: null,
       });
       // Invalidate stale cache so fetchSessionsInitial() overwrites with fresh data
-      get()._sessionCache.delete(id);
+      get()._sessionCache.delete(cacheKey);
     } else {
       set({
         selectedProjectId: id,

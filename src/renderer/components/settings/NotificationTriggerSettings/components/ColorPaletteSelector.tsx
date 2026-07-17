@@ -8,6 +8,7 @@
 
 import { useCallback, useState } from 'react';
 
+import { useT } from '@renderer/i18n';
 import {
   isPresetColorKey,
   resolveColorHex,
@@ -28,9 +29,17 @@ export const ColorPaletteSelector = ({
   onChange,
   disabled,
 }: Readonly<ColorPaletteSelectorProps>): React.JSX.Element => {
+  const t = useT();
   const isCustom = !!value && !isPresetColorKey(value);
   const [hexInput, setHexInput] = useState(isCustom ? value : '');
   const [showHexInput, setShowHexInput] = useState(isCustom);
+
+  // Preset color names are translated; custom hex values are shown verbatim
+  const colorLabel = useCallback(
+    (color: TriggerColor): string =>
+      isPresetColorKey(color) ? t(`settings.notifications.color.${color}`) : color,
+    [t]
+  );
 
   // Only update local state on each keystroke — do NOT call onChange here.
   const handleHexInputChange = useCallback((raw: string) => {
@@ -82,7 +91,7 @@ export const ColorPaletteSelector = ({
         <span
           className="size-6 shrink-0 rounded border border-border-subtle"
           style={{ backgroundColor: previewHex }}
-          title={value ?? 'red'}
+          title={colorLabel(value ?? 'red')}
         />
 
         {/* Preset palette */}
@@ -92,7 +101,7 @@ export const ColorPaletteSelector = ({
             <button
               key={color.key}
               type="button"
-              title={color.label}
+              title={colorLabel(color.key as TriggerColor)}
               onClick={() => handlePresetClick(color.key as TriggerColor)}
               disabled={disabled}
               className={`size-5 rounded-full transition-all ${isSelected ? 'ring-2 ring-white/60 ring-offset-1 ring-offset-surface' : 'hover:ring-1 hover:ring-white/30'}`}
@@ -104,7 +113,7 @@ export const ColorPaletteSelector = ({
         {/* Custom hex toggle */}
         <button
           type="button"
-          title="Custom hex color"
+          title={t('settings.notifications.customHexColor')}
           onClick={handleCustomClick}
           disabled={disabled}
           className={`flex size-5 items-center justify-center rounded-full border text-[9px] font-bold leading-none transition-all ${
@@ -135,7 +144,7 @@ export const ColorPaletteSelector = ({
             }`}
           />
           {hexInput && !HEX_RE.test(hexInput) && (
-            <span className="text-xs text-red-400">Invalid hex</span>
+            <span className="text-xs text-red-400">{t('settings.notifications.invalidHex')}</span>
           )}
         </div>
       )}

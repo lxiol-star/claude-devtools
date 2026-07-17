@@ -20,7 +20,6 @@ import {
   calculateMetrics,
   extractTextContent,
   getTaskCalls,
-  parseJsonlFile,
 } from '@main/utils/jsonl';
 import * as path from 'path';
 
@@ -66,15 +65,16 @@ export class SessionParser {
    * Parse a session JSONL file and return structured data.
    */
   async parseSession(projectId: string, sessionId: string): Promise<ParsedSession> {
-    const sessionPath = this.projectScanner.getSessionPath(projectId, sessionId);
+    const sessionPath = await this.projectScanner.getSessionPath(projectId, sessionId);
     return this.parseSessionFile(sessionPath);
   }
 
   /**
-   * Parse a JSONL file at the given path.
+   * Parse a session file at the given path.
+   * The ProjectScanner's backend handles the agent-specific format.
    */
   async parseSessionFile(filePath: string): Promise<ParsedSession> {
-    const messages = await parseJsonlFile(filePath, this.projectScanner.getFileSystemProvider());
+    const messages = await this.projectScanner.parseSessionFile(filePath);
     return this.processMessages(messages);
   }
 
@@ -363,7 +363,7 @@ export class SessionParser {
     messages: ParsedMessage[];
     metrics: SessionMetrics;
   }> {
-    const messages = await parseJsonlFile(filePath, this.projectScanner.getFileSystemProvider());
+    const messages = await this.projectScanner.parseSessionFile(filePath);
     const metrics = calculateMetrics(messages);
 
     return { messages, metrics };
@@ -389,9 +389,13 @@ export class SessionParser {
     const results = new Map();
 
     for (const filePath of subagentFiles) {
-      // Extract agent ID from filename (agent-{id}.jsonl)
+      // Extract agent ID from filename (Claude: agent-{id}.jsonl)
+      // or from the containing directory name (Kimi: agents/<agent_name>/wire.jsonl).
       const filename = path.basename(filePath);
-      const agentId = filename.replace(/^agent-/, '').replace(/\.jsonl$/, '');
+      let agentId = filename.replace(/^agent-/, '').replace(/\.jsonl$/, '');
+      if (filename === 'wire.jsonl') {
+        agentId = path.basename(path.dirname(filePath));
+      }
 
       const { messages, metrics } = await this.parseSubagentFile(filePath);
       results.set(agentId, { filePath, messages, metrics });

@@ -10,6 +10,7 @@ import React, { useRef } from 'react';
 
 import { CARD_ICON_MUTED } from '@renderer/constants/cssVariables';
 import { getTeamColorSet } from '@renderer/constants/teamColors';
+import { useT } from '@renderer/i18n';
 import {
   getToolContextTokens,
   getToolStatus,
@@ -64,6 +65,7 @@ export const LinkedToolItem: React.FC<LinkedToolItemProps> = React.memo(function
   notificationDotColor,
   registerRef,
 }) {
+  const t = useT();
   const status = getToolStatus(linkedTool);
   const summary = getToolSummary(linkedTool.name, linkedTool.input);
   const elementRef = useRef<HTMLDivElement>(null);
@@ -93,7 +95,7 @@ export const LinkedToolItem: React.FC<LinkedToolItemProps> = React.memo(function
           {name}
         </span>
         <span className="text-xs" style={{ color: CARD_ICON_MUTED }}>
-          Teammate spawned
+          {t('chat.tool.teammateSpawned')}
         </span>
       </div>
     );
@@ -108,7 +110,7 @@ export const LinkedToolItem: React.FC<LinkedToolItemProps> = React.memo(function
       <div ref={handleRef} className="flex items-center gap-2 px-3 py-1.5">
         <span className="size-2 rounded-full bg-zinc-500" />
         <span className="text-xs" style={{ color: CARD_ICON_MUTED }}>
-          Shutdown requested &rarr;{' '}
+          {t('chat.tool.shutdownRequested')} &rarr;{' '}
           <span className="font-medium text-text-secondary">{target}</span>
         </span>
       </div>
@@ -193,13 +195,13 @@ export const LinkedToolItem: React.FC<LinkedToolItemProps> = React.memo(function
             style={{ color: 'var(--tool-item-muted)' }}
           >
             <StatusDot status="orphaned" />
-            No result received
+            {t('chat.tool.noResult')}
           </div>
         )}
 
         {/* Timing */}
         <div className="text-xs" style={{ color: 'var(--tool-item-muted)' }}>
-          Duration: {formatDuration(linkedTool.durationMs)}
+          {t('chat.tool.duration', { duration: formatDuration(linkedTool.durationMs) })}
         </div>
       </BaseItem>
     </div>

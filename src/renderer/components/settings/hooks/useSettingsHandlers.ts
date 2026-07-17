@@ -6,6 +6,7 @@
 import { useCallback, useRef } from 'react';
 
 import { api } from '@renderer/api';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 
 import type { RepositoryDropdownItem } from './useSettingsConfig';
@@ -62,6 +63,8 @@ export function useSettingsHandlers({
   setOptimisticConfig,
   updateConfig,
 }: UseSettingsHandlersProps): SettingsHandlers {
+  const t = useT();
+
   // Use ref for config to avoid recreating callbacks when config changes
   const configRef = useRef(config);
   configRef.current = config;
@@ -105,12 +108,12 @@ export function useSettingsHandlers({
         setOptimisticConfig(updatedConfig);
         setStoreState({ appConfig: updatedConfig });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to snooze notifications');
+        setError(err instanceof Error ? err.message : t('settings.notifications.snoozeError'));
       } finally {
         setSaving(false);
       }
     },
-    [setSaving, setConfig, setOptimisticConfig, setError]
+    [setSaving, setConfig, setOptimisticConfig, setError, t]
   );
 
   const handleClearSnooze = useCallback(async () => {
@@ -121,11 +124,11 @@ export function useSettingsHandlers({
       setOptimisticConfig(updatedConfig);
       setStoreState({ appConfig: updatedConfig });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to clear snooze');
+      setError(err instanceof Error ? err.message : t('settings.notifications.clearSnoozeError'));
     } finally {
       setSaving(false);
     }
-  }, [setSaving, setConfig, setOptimisticConfig, setError]);
+  }, [setSaving, setConfig, setOptimisticConfig, setError, t]);
 
   const handleAddIgnoredRepository = useCallback(
     async (item: RepositoryDropdownItem) => {
@@ -136,12 +139,12 @@ export function useSettingsHandlers({
         setOptimisticConfig(updatedConfig);
         setStoreState({ appConfig: updatedConfig });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to add repository');
+        setError(err instanceof Error ? err.message : t('settings.notifications.addRepositoryError'));
       } finally {
         setSaving(false);
       }
     },
-    [setSaving, setConfig, setOptimisticConfig, setError]
+    [setSaving, setConfig, setOptimisticConfig, setError, t]
   );
 
   const handleRemoveIgnoredRepository = useCallback(
@@ -153,12 +156,14 @@ export function useSettingsHandlers({
         setOptimisticConfig(updatedConfig);
         setStoreState({ appConfig: updatedConfig });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to remove repository');
+        setError(
+          err instanceof Error ? err.message : t('settings.notifications.removeRepositoryError')
+        );
       } finally {
         setSaving(false);
       }
     },
-    [setSaving, setConfig, setOptimisticConfig, setError]
+    [setSaving, setConfig, setOptimisticConfig, setError, t]
   );
 
   // Trigger handlers
@@ -171,12 +176,12 @@ export function useSettingsHandlers({
         setOptimisticConfig(updatedConfig);
         setStoreState({ appConfig: updatedConfig });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to add trigger');
+        setError(err instanceof Error ? err.message : t('settings.notifications.addTriggerError'));
       } finally {
         setSaving(false);
       }
     },
-    [setSaving, setConfig, setOptimisticConfig, setError]
+    [setSaving, setConfig, setOptimisticConfig, setError, t]
   );
 
   const handleUpdateTrigger = useCallback(
@@ -185,8 +190,8 @@ export function useSettingsHandlers({
       setOptimisticConfig((prev) => {
         if (!prev) return prev;
         const updatedTriggers =
-          prev.notifications.triggers?.map((t) =>
-            t.id === triggerId ? { ...t, ...updates } : t
+          prev.notifications.triggers?.map((trigger) =>
+            trigger.id === triggerId ? { ...trigger, ...updates } : trigger
           ) ?? [];
         return {
           ...prev,
@@ -206,12 +211,12 @@ export function useSettingsHandlers({
       } catch (err) {
         // Revert optimistic update on error using ref to avoid stale closure
         setOptimisticConfig(configRef.current);
-        setError(err instanceof Error ? err.message : 'Failed to update trigger');
+        setError(err instanceof Error ? err.message : t('settings.notifications.updateTriggerError'));
       } finally {
         setSaving(false);
       }
     },
-    [setSaving, setConfig, setOptimisticConfig, setError]
+    [setSaving, setConfig, setOptimisticConfig, setError, t]
   );
 
   const handleRemoveTrigger = useCallback(
@@ -223,12 +228,14 @@ export function useSettingsHandlers({
         setOptimisticConfig(updatedConfig);
         setStoreState({ appConfig: updatedConfig });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to remove trigger');
+        setError(
+          err instanceof Error ? err.message : t('settings.notifications.removeTriggerError')
+        );
       } finally {
         setSaving(false);
       }
     },
-    [setSaving, setConfig, setOptimisticConfig, setError]
+    [setSaving, setConfig, setOptimisticConfig, setError, t]
   );
 
   // Display handlers
@@ -241,7 +248,7 @@ export function useSettingsHandlers({
 
   // Advanced handlers
   const handleResetToDefaults = useCallback(async () => {
-    if (!confirm('Are you sure you want to reset all settings to defaults?')) {
+    if (!confirm(t('settings.advanced.resetConfirm'))) {
       return;
     }
     try {
@@ -298,6 +305,8 @@ export function useSettingsHandlers({
         sessions: {
           pinnedSessions: {},
           hiddenSessions: {},
+          sessionAnnotations: {},
+          savedViews: [],
         },
       };
 
@@ -308,11 +317,11 @@ export function useSettingsHandlers({
       setOptimisticConfig(updatedConfig);
       setStoreState({ appConfig: updatedConfig });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset settings');
+      setError(err instanceof Error ? err.message : t('settings.advanced.resetError'));
     } finally {
       setSaving(false);
     }
-  }, [setSaving, setConfig, setOptimisticConfig, setError]);
+  }, [setSaving, setConfig, setOptimisticConfig, setError, t]);
 
   const handleExportConfig = useCallback(() => {
     if (!configRef.current) return;
@@ -332,9 +341,9 @@ export function useSettingsHandlers({
     try {
       await api.config.openInEditor();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to open config in editor');
+      setError(err instanceof Error ? err.message : t('settings.advanced.openInEditorError'));
     }
-  }, [setError]);
+  }, [setError, t]);
 
   const handleImportConfig = useCallback(() => {
     const input = document.createElement('input');
@@ -364,13 +373,13 @@ export function useSettingsHandlers({
         setOptimisticConfig(updatedConfig);
         setStoreState({ appConfig: updatedConfig });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to import config');
+        setError(err instanceof Error ? err.message : t('settings.advanced.importError'));
       } finally {
         setSaving(false);
       }
     };
     input.click();
-  }, [setSaving, setConfig, setOptimisticConfig, setError]);
+  }, [setSaving, setConfig, setOptimisticConfig, setError, t]);
 
   return {
     handleGeneralToggle,

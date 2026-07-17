@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 
+import { useT } from '@renderer/i18n';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import { type ItemStatus, StatusDot } from '../BaseItem';
@@ -14,15 +15,16 @@ import { type ItemStatus, StatusDot } from '../BaseItem';
 interface CollapsibleOutputSectionProps {
   status: ItemStatus;
   children: React.ReactNode;
-  /** Label shown in the header (default: "Output") */
+  /** Label shown in the header (default: localized "Output") */
   label?: string;
 }
 
 export const CollapsibleOutputSection: React.FC<CollapsibleOutputSectionProps> = ({
   status,
   children,
-  label = 'Output',
+  label,
 }) => {
+  const t = useT();
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -34,7 +36,7 @@ export const CollapsibleOutputSection: React.FC<CollapsibleOutputSectionProps> =
         onClick={() => setIsExpanded((prev) => !prev)}
       >
         {isExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-        {label}
+        {label ?? t('chat.output')}
         <StatusDot status={status} />
       </button>
       {isExpanded && (

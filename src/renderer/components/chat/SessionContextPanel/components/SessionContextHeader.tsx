@@ -12,6 +12,7 @@ import {
   COLOR_TEXT_MUTED,
   COLOR_TEXT_SECONDARY,
 } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { ArrowDownWideNarrow, FileText, LayoutList, X } from 'lucide-react';
 
 import { formatTokens } from '../utils/formatting';
@@ -44,6 +45,8 @@ export const SessionContextHeader = ({
   viewMode,
   onViewModeChange,
 }: Readonly<SessionContextHeaderProps>): React.ReactElement => {
+  const t = useT();
+
   return (
     <div className="shrink-0 px-4 py-3" style={{ borderBottom: `1px solid ${COLOR_BORDER}` }}>
       {/* Title row */}
@@ -51,7 +54,7 @@ export const SessionContextHeader = ({
         <div className="flex items-center gap-2">
           <FileText size={16} style={{ color: COLOR_TEXT_SECONDARY }} />
           <h2 className="text-sm font-semibold" style={{ color: COLOR_TEXT }}>
-            Visible Context
+            {t('chat.contextPanel.title')}
           </h2>
           <span
             className="rounded px-1.5 py-0.5 text-xs"
@@ -70,7 +73,7 @@ export const SessionContextHeader = ({
               onClick={onClose}
               className="rounded p-1 transition-colors hover:bg-white/10"
               style={{ color: COLOR_TEXT_SECONDARY }}
-              aria-label="Close panel"
+              aria-label={t('chat.contextPanel.closePanel')}
             >
               <X size={16} />
             </button>
@@ -86,7 +89,7 @@ export const SessionContextHeader = ({
         <div className="flex items-center gap-4">
           {/* Visible Context tokens */}
           <div>
-            <span style={{ color: COLOR_TEXT_MUTED }}>Visible: </span>
+            <span style={{ color: COLOR_TEXT_MUTED }}>{t('chat.contextPanel.visibleLabel')} </span>
             <span className="font-medium tabular-nums" style={{ color: COLOR_TEXT_SECONDARY }}>
               ~{formatTokens(totalTokens)}
             </span>
@@ -94,7 +97,7 @@ export const SessionContextHeader = ({
           {/* Total Session tokens (if provided) */}
           {totalSessionTokens !== undefined && totalSessionTokens > 0 && (
             <div>
-              <span style={{ color: COLOR_TEXT_MUTED }}>Total: </span>
+              <span style={{ color: COLOR_TEXT_MUTED }}>{t('chat.contextPanel.totalLabel')} </span>
               <span className="font-medium tabular-nums" style={{ color: COLOR_TEXT_SECONDARY }}>
                 {formatTokens(totalSessionTokens)}
               </span>
@@ -110,7 +113,9 @@ export const SessionContextHeader = ({
               color: COLOR_TEXT_MUTED,
             }}
           >
-            {Math.min((totalTokens / totalSessionTokens) * 100, 100).toFixed(1)}% of total
+            {t('chat.contextPanel.percentOfTotal', {
+              percent: Math.min((totalTokens / totalSessionTokens) * 100, 100).toFixed(1),
+            })}
           </span>
         )}
       </div>
@@ -122,7 +127,7 @@ export const SessionContextHeader = ({
           style={{ borderTop: `1px solid ${COLOR_BORDER_SUBTLE}` }}
         >
           <span className="mr-1 text-[10px]" style={{ color: COLOR_TEXT_MUTED }}>
-            Phase:
+            {t('chat.contextPanel.phaseLabel')}
           </span>
           {phaseInfo.phases.map((phase) => (
             <button
@@ -151,7 +156,7 @@ export const SessionContextHeader = ({
               color: selectedPhase === null ? '#818cf8' : COLOR_TEXT_MUTED,
             }}
           >
-            Current
+            {t('chat.contextPanel.current')}
           </button>
         </div>
       )}
@@ -162,7 +167,7 @@ export const SessionContextHeader = ({
         style={{ borderTop: `1px solid ${COLOR_BORDER_SUBTLE}` }}
       >
         <span className="mr-1 text-[10px]" style={{ color: COLOR_TEXT_MUTED }}>
-          View:
+          {t('chat.contextPanel.viewLabel')}
         </span>
         <button
           onClick={() => onViewModeChange('category')}
@@ -174,7 +179,7 @@ export const SessionContextHeader = ({
           }}
         >
           <LayoutList size={10} />
-          Category
+          {t('chat.contextPanel.category')}
         </button>
         <button
           onClick={() => onViewModeChange('ranked')}
@@ -186,7 +191,7 @@ export const SessionContextHeader = ({
           }}
         >
           <ArrowDownWideNarrow size={10} />
-          By Size
+          {t('chat.contextPanel.bySize')}
         </button>
       </div>
     </div>

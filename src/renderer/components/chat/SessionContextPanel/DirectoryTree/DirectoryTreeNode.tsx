@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 
 import { CopyablePath } from '@renderer/components/common/CopyablePath';
 import { COLOR_TEXT_MUTED, COLOR_TEXT_SECONDARY } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { ChevronRight } from 'lucide-react';
 
 import { formatTokens } from '../utils/formatting';
@@ -24,6 +25,7 @@ export const DirectoryTreeNode = ({
   depth = 0,
   onNavigateToTurn,
 }: Readonly<DirectoryTreeNodeProps>): React.ReactElement | null => {
+  const t = useT();
   const [expanded, setExpanded] = useState(true);
   const indent = depth * 12;
 
@@ -48,7 +50,9 @@ export const DirectoryTreeNode = ({
           className="text-xs"
           style={{ color: COLOR_TEXT_SECONDARY }}
         />
-        <span style={{ color: COLOR_TEXT_MUTED }}>(~{formatTokens(node.tokens ?? 0)})</span>
+        <span style={{ color: COLOR_TEXT_MUTED }}>
+          {t('chat.tokensParens', { count: formatTokens(node.tokens ?? 0) })}
+        </span>
         {node.firstSeenInGroup &&
           (isClickable ? (
             <button
@@ -67,7 +71,7 @@ export const DirectoryTreeNode = ({
               }}
               onClick={() => onNavigateToTurn(turnIndex)}
             >
-              @{formatFirstSeen(node.firstSeenInGroup)}
+              @{formatFirstSeen(node.firstSeenInGroup, t)}
             </button>
           ) : (
             <span
@@ -77,7 +81,7 @@ export const DirectoryTreeNode = ({
                 opacity: 0.7,
               }}
             >
-              @{formatFirstSeen(node.firstSeenInGroup)}
+              @{formatFirstSeen(node.firstSeenInGroup, t)}
             </span>
           ))}
       </div>

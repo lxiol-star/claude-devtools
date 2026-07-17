@@ -64,21 +64,22 @@ export type ContextViewMode = 'category' | 'ranked';
 export type ClaudeMdGroupCategory = 'global' | 'project' | 'directory';
 
 interface ClaudeMdGroupConfig {
-  label: string;
+  /** i18n key for the group label */
+  labelKey: string;
   sources: ClaudeMdSource[];
 }
 
 export const CLAUDE_MD_GROUP_CONFIG: Record<ClaudeMdGroupCategory, ClaudeMdGroupConfig> = {
   global: {
-    label: 'Global',
+    labelKey: 'chat.contextPanel.group.global',
     sources: ['enterprise', 'user-memory', 'user-rules', 'auto-memory'],
   },
   project: {
-    label: 'Project',
+    labelKey: 'chat.contextPanel.group.project',
     sources: ['project-memory', 'project-rules', 'project-local'],
   },
   directory: {
-    label: 'Directory',
+    labelKey: 'chat.contextPanel.group.directory',
     sources: ['directory'],
   },
 };

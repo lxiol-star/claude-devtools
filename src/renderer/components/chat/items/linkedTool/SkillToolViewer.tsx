@@ -7,6 +7,7 @@
 import React from 'react';
 
 import { CodeBlockViewer } from '@renderer/components/chat/viewers';
+import { useT } from '@renderer/i18n';
 
 import type { LinkedToolItem } from '@renderer/types/groups';
 
@@ -15,8 +16,9 @@ interface SkillToolViewerProps {
 }
 
 export const SkillToolViewer: React.FC<SkillToolViewerProps> = ({ linkedTool }) => {
+  const t = useT();
   const skillInstructions = linkedTool.skillInstructions;
-  const skillName = (linkedTool.input.skill as string) || 'Unknown Skill';
+  const skillName = (linkedTool.input.skill as string) || t('chat.tool.unknownSkill');
 
   const resultContent = linkedTool.result?.content;
   const resultText =
@@ -34,7 +36,7 @@ export const SkillToolViewer: React.FC<SkillToolViewerProps> = ({ linkedTool }) 
       {resultText && (
         <div>
           <div className="mb-1 text-xs" style={{ color: 'var(--tool-item-muted)' }}>
-            Result
+            {t('chat.tool.result')}
           </div>
           <div
             className="overflow-x-auto rounded p-3 font-mono text-xs"
@@ -53,10 +55,10 @@ export const SkillToolViewer: React.FC<SkillToolViewerProps> = ({ linkedTool }) 
       {skillInstructions && (
         <div>
           <div className="mb-1 text-xs" style={{ color: 'var(--tool-item-muted)' }}>
-            Skill Instructions
+            {t('chat.tool.skillInstructions')}
           </div>
           <CodeBlockViewer
-            fileName={`${skillName} skill`}
+            fileName={t('chat.tool.skillFileName', { name: skillName })}
             content={skillInstructions}
             startLine={1}
           />

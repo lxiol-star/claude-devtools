@@ -17,12 +17,14 @@
  * - config:testTrigger: Test a trigger against historical session data
  */
 
+import { detectBackend } from '@main/backends';
 import { getAutoDetectedClaudeBasePath, getClaudeBasePath } from '@main/utils/pathDecoder';
 import { getErrorMessage } from '@shared/utils/errorHandling';
 import { createLogger } from '@shared/utils/logger';
 import { execFile } from 'child_process';
 import { BrowserWindow, dialog, type IpcMain, type IpcMainInvokeEvent } from 'electron';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { promisify } from 'util';
 
@@ -30,6 +32,8 @@ import {
   type AppConfig,
   ConfigManager,
   type NotificationTrigger,
+  type SavedView,
+  type SessionAnnotation,
   type TriggerContentType,
   type TriggerMatchField,
   type TriggerMode,
@@ -43,6 +47,7 @@ import type { TriggerColor } from '@shared/constants/triggerColors';
 import type {
   ClaudeRootFolderSelection,
   ClaudeRootInfo,
+  KnownDataRoot,
   WslClaudeRootCandidate,
 } from '@shared/types';
 
@@ -112,6 +117,14 @@ export function registerConfigHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('config:unhideSession', handleUnhideSession);
   ipcMain.handle('config:hideSessions', handleHideSessions);
   ipcMain.handle('config:unhideSessions', handleUnhideSessions);
+
+  // Session annotation handlers
+  ipcMain.handle('config:setSessionAnnotation', handleSetSessionAnnotation);
+  ipcMain.handle('config:removeSessionAnnotation', handleRemoveSessionAnnotation);
+
+  // Saved view handlers
+  ipcMain.handle('config:addSavedView', handleAddSavedView);
+  ipcMain.handle('config:removeSavedView', handleRemoveSavedView);
 
   // Dialog handlers
   ipcMain.handle('config:selectFolders', handleSelectFolders);
@@ -671,10 +684,14 @@ async function handleSelectClaudeRootFolder(
 
     const selectedPath = path.resolve(path.normalize(result.filePaths[0]));
     const folderName = path.basename(selectedPath);
-    const projectsDir = path.join(selectedPath, 'projects');
     const hasProjectsDir = (() => {
       try {
-        return fs.existsSync(projectsDir) && fs.statSync(projectsDir).isDirectory();
+        // Claude Code keeps sessions in projects/, Kimi Code and Codex CLI in sessions/.
+        return ['projects', 'sessions'].some(
+          (dirName) =>
+            fs.existsSync(path.join(selectedPath, dirName)) &&
+            fs.statSync(path.join(selectedPath, dirName)).isDirectory()
+        );
       } catch {
         return false;
       }
@@ -684,7 +701,7 @@ async function handleSelectClaudeRootFolder(
       success: true,
       data: {
         path: selectedPath,
-        isClaudeDirName: folderName === '.claude',
+        isClaudeDirName: ['.claude', '.kimi-code', '.codex'].includes(folderName),
         hasProjectsDir,
       },
     };
@@ -695,6 +712,30 @@ async function handleSelectClaudeRootFolder(
       error: error instanceof Error ? error.message : 'Failed to open Claude root folder dialog',
     };
   }
+}
+
+/**
+ * Build the list of well-known data roots (Claude Code, Kimi Code, Codex CLI)
+ * for the settings UI quick-select.
+ */
+function getKnownDataRoots(): KnownDataRoot[] {
+  const home = os.homedir();
+  const candidates: { label: string; backend: KnownDataRoot['backend']; path: string }[] = [
+    { label: 'Claude Code', backend: 'claude', path: path.join(home, '.claude') },
+    { label: 'Kimi Code', backend: 'kimi', path: path.join(home, '.kimi-code') },
+    { label: 'Codex CLI', backend: 'codex', path: path.join(home, '.codex') },
+  ];
+
+  return candidates.map((candidate) => {
+    const exists = fs.existsSync(candidate.path);
+    const detected = exists ? detectBackend(candidate.path) : null;
+    return {
+      label: candidate.label,
+      backend: detected ?? candidate.backend,
+      path: candidate.path,
+      exists,
+    };
+  });
 }
 
 /**
@@ -714,6 +755,8 @@ async function handleGetClaudeRootInfo(
         defaultPath,
         resolvedPath,
         customPath,
+        backend: detectBackend(resolvedPath) ?? 'claude',
+        knownRoots: getKnownDataRoots(),
       },
     };
   } catch (error) {
@@ -1050,6 +1093,180 @@ async function handleUnhideSessions(
   }
 }
 
+/**
+ * Validates a session annotation patch payload.
+ * Returns the normalized patch on success, or an error string on failure.
+ */
+function validateAnnotationPatch(
+  patch: unknown
+): { valid: true; patch: Partial<Pick<SessionAnnotation, 'tags' | 'score' | 'note'>> } | { valid: false; error: string } {
+  if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+    return { valid: false, error: 'Annotation patch must be an object' };
+  }
+
+  const result: Partial<Pick<SessionAnnotation, 'tags' | 'score' | 'note'>> = {};
+  const source = patch as Record<string, unknown>;
+
+  if ('tags' in source) {
+    const tags = source.tags;
+    if (!Array.isArray(tags) || tags.some((tag) => typeof tag !== 'string')) {
+      return { valid: false, error: 'tags must be an array of strings' };
+    }
+    result.tags = tags as string[];
+  }
+
+  if ('score' in source) {
+    const score = source.score;
+    if (score !== null && (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 5)) {
+      return { valid: false, error: 'score must be null or a number between 0 and 5' };
+    }
+    result.score = score;
+  }
+
+  if ('note' in source) {
+    const note = source.note;
+    if (typeof note !== 'string') {
+      return { valid: false, error: 'note must be a string' };
+    }
+    result.note = note;
+  }
+
+  return { valid: true, patch: result };
+}
+
+/**
+ * Handler for 'config:setSessionAnnotation' - Sets (merges) a session annotation.
+ */
+async function handleSetSessionAnnotation(
+  _event: IpcMainInvokeEvent,
+  key: string,
+  patch: unknown
+): Promise<ConfigResult> {
+  try {
+    if (!key || typeof key !== 'string') {
+      return { success: false, error: 'Annotation key is required and must be a string' };
+    }
+
+    const validation = validateAnnotationPatch(patch);
+    if (!validation.valid) {
+      return { success: false, error: validation.error };
+    }
+
+    configManager.setSessionAnnotation(key, validation.patch);
+    return { success: true };
+  } catch (error) {
+    logger.error('Error in config:setSessionAnnotation:', error);
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+/**
+ * Handler for 'config:removeSessionAnnotation' - Removes a session annotation.
+ */
+async function handleRemoveSessionAnnotation(
+  _event: IpcMainInvokeEvent,
+  key: string
+): Promise<ConfigResult> {
+  try {
+    if (!key || typeof key !== 'string') {
+      return { success: false, error: 'Annotation key is required and must be a string' };
+    }
+
+    configManager.removeSessionAnnotation(key);
+    return { success: true };
+  } catch (error) {
+    logger.error('Error in config:removeSessionAnnotation:', error);
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+/** Valid source-backend filter values for a saved view. */
+const VALID_SOURCE_FILTERS = ['all', 'claude', 'kimi', 'codex'];
+
+/**
+ * Validates a saved-view payload.
+ * Returns the normalized fields on success, or an error string on failure.
+ */
+function validateSavedViewPayload(
+  view: unknown
+): { valid: true; view: Omit<SavedView, 'id' | 'createdAt'> } | { valid: false; error: string } {
+  if (typeof view !== 'object' || view === null || Array.isArray(view)) {
+    return { valid: false, error: 'Saved view must be an object' };
+  }
+
+  const source = view as Record<string, unknown>;
+
+  if (typeof source.name !== 'string' || source.name.trim().length === 0) {
+    return { valid: false, error: 'name is required and must be a non-empty string' };
+  }
+  if (!Array.isArray(source.tags) || source.tags.some((tag) => typeof tag !== 'string')) {
+    return { valid: false, error: 'tags must be an array of strings' };
+  }
+  if (
+    typeof source.minScore !== 'number' ||
+    !Number.isFinite(source.minScore) ||
+    source.minScore < 0 ||
+    source.minScore > 5
+  ) {
+    return { valid: false, error: 'minScore must be a number between 0 and 5' };
+  }
+  if (typeof source.sourceFilter !== 'string' || !VALID_SOURCE_FILTERS.includes(source.sourceFilter)) {
+    return { valid: false, error: 'sourceFilter must be one of all, claude, kimi, codex' };
+  }
+
+  return {
+    valid: true,
+    view: {
+      name: source.name.trim(),
+      tags: source.tags as string[],
+      minScore: source.minScore,
+      sourceFilter: source.sourceFilter,
+    },
+  };
+}
+
+/**
+ * Handler for 'config:addSavedView' - Adds a saved view (named filter preset).
+ * Returns the created view (with generated id + createdAt).
+ */
+async function handleAddSavedView(
+  _event: IpcMainInvokeEvent,
+  view: unknown
+): Promise<ConfigResult<SavedView>> {
+  try {
+    const validation = validateSavedViewPayload(view);
+    if (!validation.valid) {
+      return { success: false, error: validation.error };
+    }
+
+    const created = configManager.addSavedView(validation.view);
+    return { success: true, data: created };
+  } catch (error) {
+    logger.error('Error in config:addSavedView:', error);
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+/**
+ * Handler for 'config:removeSavedView' - Removes a saved view by id.
+ */
+async function handleRemoveSavedView(
+  _event: IpcMainInvokeEvent,
+  id: string
+): Promise<ConfigResult> {
+  try {
+    if (!id || typeof id !== 'string') {
+      return { success: false, error: 'Saved view id is required and must be a string' };
+    }
+
+    configManager.removeSavedView(id);
+    return { success: true };
+  } catch (error) {
+    logger.error('Error in config:removeSavedView:', error);
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
 // =============================================================================
 // Cleanup
 // =============================================================================
@@ -1078,6 +1295,10 @@ export function removeConfigHandlers(ipcMain: IpcMain): void {
   ipcMain.removeHandler('config:unhideSession');
   ipcMain.removeHandler('config:hideSessions');
   ipcMain.removeHandler('config:unhideSessions');
+  ipcMain.removeHandler('config:setSessionAnnotation');
+  ipcMain.removeHandler('config:removeSessionAnnotation');
+  ipcMain.removeHandler('config:addSavedView');
+  ipcMain.removeHandler('config:removeSavedView');
   ipcMain.removeHandler('config:selectFolders');
   ipcMain.removeHandler('config:selectClaudeRootFolder');
   ipcMain.removeHandler('config:getClaudeRootInfo');

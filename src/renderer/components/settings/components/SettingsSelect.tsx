@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { useT } from '@renderer/i18n';
 import { Check, ChevronDown } from 'lucide-react';
 
 interface SettingsSelectProps<T extends string | number> {
@@ -25,11 +26,12 @@ export const SettingsSelect = <T extends string | number>({
   dropUp = false,
   fullWidth = false,
 }: SettingsSelectProps<T>): React.JSX.Element => {
+  const t = useT();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Find current label
-  const currentLabel = options.find((opt) => opt.value === value)?.label ?? 'Select...';
+  const currentLabel = options.find((opt) => opt.value === value)?.label ?? t('settings.select.placeholder');
 
   // Close dropdown when clicking outside
   useEffect(() => {

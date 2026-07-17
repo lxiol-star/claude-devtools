@@ -5,6 +5,7 @@
 import React from 'react';
 
 import { CopyablePath } from '@renderer/components/common/CopyablePath';
+import { useT } from '@renderer/i18n';
 import { resolveAbsolutePath, shortenDisplayPath } from '@renderer/utils/pathDisplay';
 import { File } from 'lucide-react';
 
@@ -23,6 +24,7 @@ export const MentionedFileItem = ({
   projectRoot,
   onNavigateToTurn,
 }: Readonly<MentionedFileItemProps>): React.ReactElement => {
+  const t = useT();
   const turnIndex = injection.firstSeenTurnIndex;
   const isClickable = onNavigateToTurn && turnIndex >= 0;
   const displayPath = shortenDisplayPath(injection.path, projectRoot);
@@ -46,13 +48,13 @@ export const MentionedFileItem = ({
               color: 'var(--color-error)',
             }}
           >
-            missing
+            {t('chat.contextPanel.missing')}
           </span>
         )}
       </div>
       <div className="ml-4 mt-0.5 flex items-center gap-2">
         <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          ~{formatTokens(injection.estimatedTokens)} tokens
+          {t('chat.tokens', { count: formatTokens(injection.estimatedTokens) })}
         </span>
         {isClickable ? (
           <span
@@ -72,7 +74,7 @@ export const MentionedFileItem = ({
               }
             }}
           >
-            @Turn {turnIndex + 1}
+            @{t('chat.turn', { turn: turnIndex + 1 })}
           </span>
         ) : (
           <span
@@ -82,7 +84,7 @@ export const MentionedFileItem = ({
               opacity: 0.7,
             }}
           >
-            @Turn {turnIndex + 1}
+            @{t('chat.turn', { turn: turnIndex + 1 })}
           </span>
         )}
       </div>

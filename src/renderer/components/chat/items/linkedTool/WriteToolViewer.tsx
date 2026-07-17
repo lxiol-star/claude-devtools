@@ -7,6 +7,7 @@
 import React from 'react';
 
 import { CodeBlockViewer, MarkdownViewer } from '@renderer/components/chat/viewers';
+import { useT } from '@renderer/i18n';
 
 import type { LinkedToolItem } from '@renderer/types/groups';
 
@@ -15,6 +16,7 @@ interface WriteToolViewerProps {
 }
 
 export const WriteToolViewer: React.FC<WriteToolViewerProps> = ({ linkedTool }) => {
+  const t = useT();
   const toolUseResult = linkedTool.result?.toolUseResult as Record<string, unknown> | undefined;
 
   const filePath = (toolUseResult?.filePath as string) || (linkedTool.input.file_path as string);
@@ -26,7 +28,7 @@ export const WriteToolViewer: React.FC<WriteToolViewerProps> = ({ linkedTool }) 
   return (
     <div className="space-y-2">
       <div className="mb-1 text-xs text-zinc-500">
-        {isCreate ? 'Created file' : 'Wrote to file'}
+        {isCreate ? t('chat.tool.createdFile') : t('chat.tool.wroteToFile')}
       </div>
       {isMarkdownFile && (
         <div className="flex items-center justify-end gap-1">
@@ -40,7 +42,7 @@ export const WriteToolViewer: React.FC<WriteToolViewerProps> = ({ linkedTool }) 
               border: '1px solid var(--tag-border)',
             }}
           >
-            Code
+            {t('chat.viewer.code')}
           </button>
           <button
             type="button"
@@ -52,12 +54,12 @@ export const WriteToolViewer: React.FC<WriteToolViewerProps> = ({ linkedTool }) 
               border: '1px solid var(--tag-border)',
             }}
           >
-            Preview
+            {t('chat.viewer.preview')}
           </button>
         </div>
       )}
       {isMarkdownFile && viewMode === 'preview' ? (
-        <MarkdownViewer content={content} label="Markdown Preview" copyable />
+        <MarkdownViewer content={content} label={t('chat.viewer.markdownPreview')} copyable />
       ) : (
         <CodeBlockViewer fileName={filePath} content={content} startLine={1} />
       )}

@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { getTriggerColorDef } from '@shared/constants/triggerColors';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -30,6 +31,7 @@ interface FilterChip {
 }
 
 export const NotificationsView = (): React.JSX.Element => {
+  const t = useT();
   const {
     notifications,
     unreadCount,
@@ -188,7 +190,7 @@ export const NotificationsView = (): React.JSX.Element => {
             style={{ color: 'var(--color-text-muted)' }}
           />
           <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Loading notifications...
+            {t('notifications.loading')}
           </span>
         </div>
       </div>
@@ -207,17 +209,17 @@ export const NotificationsView = (): React.JSX.Element => {
           <div className="flex items-center gap-2">
             <Inbox className="size-4" style={{ color: 'var(--color-text-secondary)' }} />
             <span className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-              Notifications
+              {t('notifications.title')}
             </span>
             {notifications.length > 0 && (
               <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 {activeFilter !== null
                   ? filteredUnreadCount > 0
-                    ? `${filteredUnreadCount} unread in filter`
-                    : `${filteredNotifications.length} in filter`
+                    ? t('notifications.unreadInFilter', { count: filteredUnreadCount })
+                    : t('notifications.inFilter', { count: filteredNotifications.length })
                   : unreadCount > 0
-                    ? `${unreadCount} unread`
-                    : `${notifications.length} total`}
+                    ? t('notifications.unread', { count: unreadCount })
+                    : t('notifications.total', { count: notifications.length })}
               </span>
             )}
           </div>
@@ -231,11 +233,17 @@ export const NotificationsView = (): React.JSX.Element => {
                   onClick={handleMarkAllRead}
                   className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors hover:opacity-80"
                   style={{ color: 'var(--color-text-muted)' }}
-                  title={activeFilter !== null ? 'Mark filtered as read' : 'Mark all as read'}
+                  title={
+                    activeFilter !== null
+                      ? t('notifications.markFilteredReadTitle')
+                      : t('notifications.markAllReadTitle')
+                  }
                 >
                   <CheckCheck className="size-4" />
                   <span className="hidden sm:inline">
-                    {activeFilter !== null ? 'Mark filtered read' : 'Mark all read'}
+                    {activeFilter !== null
+                      ? t('notifications.markFilteredRead')
+                      : t('notifications.markAllRead')}
                   </span>
                 </button>
               )}
@@ -249,16 +257,18 @@ export const NotificationsView = (): React.JSX.Element => {
                 }`}
                 style={showClearConfirm ? undefined : { color: 'var(--color-text-muted)' }}
                 title={
-                  activeFilter !== null ? 'Clear filtered notifications' : 'Clear all notifications'
+                  activeFilter !== null
+                    ? t('notifications.clearFilteredTitle')
+                    : t('notifications.clearAllTitle')
                 }
               >
                 <Trash2 className="size-4" />
                 <span className="hidden sm:inline">
                   {showClearConfirm
-                    ? 'Click to confirm'
+                    ? t('notifications.clickToConfirm')
                     : activeFilter !== null
-                      ? 'Clear filtered'
-                      : 'Clear all'}
+                      ? t('notifications.clearFiltered')
+                      : t('notifications.clearAll')}
                 </span>
               </button>
             </div>
@@ -286,7 +296,7 @@ export const NotificationsView = (): React.JSX.Element => {
                     : '1px solid var(--color-border)',
               }}
             >
-              All
+              {t('notifications.all')}
               <span className="opacity-60">({sortedNotifications.length})</span>
             </button>
             {/* Trigger chips */}
@@ -307,7 +317,7 @@ export const NotificationsView = (): React.JSX.Element => {
                 }}
               >
                 <span className="size-2 rounded-full" style={{ backgroundColor: chip.colorHex }} />
-                {chip.label}
+                {chip.label === OTHER_LABEL ? t('notifications.other') : chip.label}
                 <span className="opacity-60">({chip.count})</span>
               </button>
             ))}
@@ -324,10 +334,12 @@ export const NotificationsView = (): React.JSX.Element => {
           >
             <Inbox className="mb-3 size-10 opacity-30" />
             <p className="mb-1 text-sm font-medium">
-              {activeFilter !== null ? 'No matching notifications' : 'No notifications'}
+              {activeFilter !== null ? t('notifications.noMatching') : t('notifications.empty')}
             </p>
             <p className="text-xs opacity-70">
-              {activeFilter !== null ? 'Try a different filter' : "You're all caught up!"}
+              {activeFilter !== null
+                ? t('notifications.tryDifferentFilter')
+                : t('notifications.allCaughtUp')}
             </p>
           </div>
         ) : (

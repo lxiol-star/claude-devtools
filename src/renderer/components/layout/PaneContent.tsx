@@ -5,6 +5,8 @@
 
 import { TabUIProvider } from '@renderer/contexts/TabUIContext';
 
+import { AnalyticsView } from '../analytics/AnalyticsView';
+import { ComparisonView } from '../analytics/ComparisonView';
 import { DashboardView } from '../dashboard/DashboardView';
 import { MemoryView } from '../memory/MemoryView';
 import { NotificationsView } from '../notifications/NotificationsView';
@@ -41,6 +43,10 @@ export const PaneContent = ({ pane }: PaneContentProps): React.JSX.Element => {
             style={{ display: isActive ? 'flex' : 'none' }}
           >
             {tab.type === 'dashboard' && <DashboardView />}
+            {tab.type === 'analytics' && <AnalyticsView />}
+            {tab.type === 'comparison' && (
+              <ComparisonView sessions={tab.comparisonSessions ?? []} />
+            )}
             {tab.type === 'notifications' && <NotificationsView />}
             {tab.type === 'settings' && <SettingsView />}
             {tab.type === 'memory' && tab.projectId && <MemoryView projectId={tab.projectId} />}

@@ -18,6 +18,7 @@ import {
   TAG_BORDER,
   TAG_TEXT,
 } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { getBaseName } from '@renderer/utils/pathUtils';
 import { formatTokens } from '@shared/utils/tokenFormatting';
 import { Pencil } from 'lucide-react';
@@ -293,6 +294,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   maxHeight = 'max-h-96',
   tokenCount,
 }): React.JSX.Element => {
+  const t = useT();
   // Compute diff
   const oldLines = oldString.split('\n');
   const newLines = newString.split('\n');
@@ -344,12 +346,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
           )}
           {stats.removed > 0 && <span style={{ color: DIFF_REMOVED_TEXT }}>-{stats.removed}</span>}
           {stats.added === 0 && stats.removed === 0 && (
-            <span style={{ color: COLOR_TEXT_MUTED }}>Changed</span>
+            <span style={{ color: COLOR_TEXT_MUTED }}>{t('chat.diff.changed')}</span>
           )}
         </span>
         {tokenCount !== undefined && tokenCount > 0 && (
           <span className="ml-auto text-xs" style={{ color: COLOR_TEXT_MUTED }}>
-            ~{formatTokens(tokenCount)} tokens
+            {t('chat.tokens', { count: formatTokens(tokenCount) })}
           </span>
         )}
       </div>
@@ -362,7 +364,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
           ))}
           {diffLines.length === 0 && (
             <div className="px-3 py-2 italic" style={{ color: COLOR_TEXT_MUTED }}>
-              No changes detected
+              {t('chat.diff.noChanges')}
             </div>
           )}
         </div>

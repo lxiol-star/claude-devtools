@@ -7,21 +7,36 @@
 
 import { getErrorMessage } from '@shared/utils/errorHandling';
 import { createLogger } from '@shared/utils/logger';
-import electronUpdater from 'electron-updater';
-
-const { autoUpdater } = electronUpdater;
 
 import type { UpdaterStatus } from '@shared/types';
 import type { BrowserWindow } from 'electron';
+import type { AppUpdater } from 'electron-updater';
 
 const logger = createLogger('UpdaterService');
 
+function getAutoUpdater(): AppUpdater | null {
+  try {
+     
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- dynamic require to avoid electron-updater import in standalone mode
+    const electronUpdater = require('electron-updater') as { autoUpdater: AppUpdater };
+    return electronUpdater.autoUpdater;
+  } catch {
+    return null;
+  }
+}
+
 export class UpdaterService {
   private mainWindow: BrowserWindow | null = null;
+  private readonly autoUpdater: AppUpdater | null;
 
   constructor() {
-    autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
+    this.autoUpdater = getAutoUpdater();
+    if (!this.autoUpdater) {
+      return;
+    }
+
+    this.autoUpdater.autoDownload = false;
+    this.autoUpdater.autoInstallOnAppQuit = true;
 
     this.bindEvents();
   }
@@ -37,8 +52,11 @@ export class UpdaterService {
    * Check for available updates.
    */
   async checkForUpdates(): Promise<void> {
+    if (!this.autoUpdater) {
+      return;
+    }
     try {
-      await autoUpdater.checkForUpdates();
+      await this.autoUpdater.checkForUpdates();
     } catch (error) {
       logger.error('Check for updates failed:', getErrorMessage(error));
     }
@@ -48,8 +66,11 @@ export class UpdaterService {
    * Download the available update.
    */
   async downloadUpdate(): Promise<void> {
+    if (!this.autoUpdater) {
+      return;
+    }
     try {
-      await autoUpdater.downloadUpdate();
+      await this.autoUpdater.downloadUpdate();
     } catch (error) {
       logger.error('Download update failed:', getErrorMessage(error));
     }
@@ -61,7 +82,10 @@ export class UpdaterService {
    * isForceRunAfter=true launches the app after install. Other platforms ignore these.
    */
   quitAndInstall(): void {
-    autoUpdater.quitAndInstall(true, true);
+    if (!this.autoUpdater) {
+      return;
+    }
+    this.autoUpdater.quitAndInstall(true, true);
   }
 
   private sendStatus(status: UpdaterStatus): void {
@@ -71,12 +95,16 @@ export class UpdaterService {
   }
 
   private bindEvents(): void {
-    autoUpdater.on('checking-for-update', () => {
+    if (!this.autoUpdater) {
+      return;
+    }
+
+    this.autoUpdater.on('checking-for-update', () => {
       logger.info('Checking for update...');
       this.sendStatus({ type: 'checking' });
     });
 
-    autoUpdater.on('update-available', (info) => {
+    this.autoUpdater.on('update-available', (info) => {
       logger.info('Update available:', info.version);
       this.sendStatus({
         type: 'available',
@@ -85,12 +113,12 @@ export class UpdaterService {
       });
     });
 
-    autoUpdater.on('update-not-available', () => {
+    this.autoUpdater.on('update-not-available', () => {
       logger.info('No update available');
       this.sendStatus({ type: 'not-available' });
     });
 
-    autoUpdater.on('download-progress', (progress) => {
+    this.autoUpdater.on('download-progress', (progress) => {
       this.sendStatus({
         type: 'downloading',
         progress: {
@@ -101,7 +129,7 @@ export class UpdaterService {
       });
     });
 
-    autoUpdater.on('update-downloaded', (info) => {
+    this.autoUpdater.on('update-downloaded', (info) => {
       logger.info('Update downloaded:', info.version);
       this.sendStatus({
         type: 'downloaded',
@@ -109,7 +137,7 @@ export class UpdaterService {
       });
     });
 
-    autoUpdater.on('error', (error) => {
+    this.autoUpdater.on('error', (error: Error) => {
       logger.error('Updater error:', getErrorMessage(error));
       this.sendStatus({
         type: 'error',

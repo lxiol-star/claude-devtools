@@ -14,8 +14,36 @@ import type { AppState } from '../types';
 import type { ContextSnapshot } from '@renderer/services/contextStorage';
 import type { Project, RepositoryGroup } from '@renderer/types/data';
 import type { Pane } from '@renderer/types/panes';
-import type { ContextInfo } from '@shared/types/api';
+import type { ContextInfo, DataBackendName } from '@shared/types/api';
 import type { StateCreator } from 'zustand';
+
+/**
+ * Source filter for the sidebar: 'all' shows every source, a backend name keeps
+ * only cards/sessions from that backend. This is a pure client-side view filter
+ * applied on top of the already-loaded aggregate data — it never switches the
+ * active context or refetches.
+ */
+export type SourceFilter = DataBackendName | 'all';
+
+/**
+ * Whether the store is effectively in aggregate ("All") mode — i.e. the loaded
+ * data is the cross-backend merged set. This is independent of sourceFilter:
+ * filtering to a single backend is done client-side on the same aggregate data,
+ * so we must keep loading (and caching) it aggregately regardless of the chip.
+ *
+ * Requires multiple local backend contexts AND a local active context —
+ * aggregate queries merge local backends only, so an SSH workspace or a
+ * single-source install always uses the single-context path.
+ */
+export function isAggregateSourceMode(state: {
+  availableContexts: ContextInfo[];
+  activeContextId: string;
+}): boolean {
+  const localContexts = state.availableContexts.filter((ctx) => ctx.type === 'local');
+  if (localContexts.length <= 1) return false;
+  const active = state.availableContexts.find((ctx) => ctx.id === state.activeContextId);
+  return active?.type === 'local';
+}
 
 // =============================================================================
 // Slice Interface
@@ -28,11 +56,13 @@ export interface ContextSlice {
   targetContextId: string | null; // context being switched to
   contextSnapshotsReady: boolean; // true after initial IndexedDB check
   availableContexts: ContextInfo[]; // list of all available contexts (local + SSH)
+  sourceFilter: SourceFilter; // sidebar source filter ('all' = aggregate mixed view)
 
   // Actions
   switchContext: (targetContextId: string) => Promise<void>;
   initializeContextSystem: () => Promise<void>;
   fetchAvailableContexts: () => Promise<void>;
+  setSourceFilter: (filter: SourceFilter) => void;
 }
 
 // =============================================================================
@@ -231,6 +261,7 @@ export const createContextSlice: StateCreator<AppState, [], [], ContextSlice> = 
   targetContextId: null,
   contextSnapshotsReady: false,
   availableContexts: [{ id: 'local', type: 'local' as const }],
+  sourceFilter: 'all',
 
   // Initialize context system (called once on app mount)
   initializeContextSystem: async () => {
@@ -252,6 +283,13 @@ export const createContextSlice: StateCreator<AppState, [], [], ContextSlice> = 
 
       // Fetch available contexts
       await get().fetchAvailableContexts();
+
+      // Sync dataBackend label with the active context metadata.
+      const state = get();
+      const activeContext = state.availableContexts.find((ctx) => ctx.id === state.activeContextId);
+      if (activeContext?.backend) {
+        set({ dataBackend: activeContext.backend });
+      }
     } catch (error) {
       console.error('[contextSlice] Failed to initialize context system:', error);
       set({ contextSnapshotsReady: true }); // Continue anyway
@@ -261,13 +299,41 @@ export const createContextSlice: StateCreator<AppState, [], [], ContextSlice> = 
   // Fetch list of available contexts (local + SSH)
   fetchAvailableContexts: async () => {
     try {
+      const prevLocalCount = get().availableContexts.filter((ctx) => ctx.type === 'local').length;
       const result = await api.context.list();
       set({ availableContexts: result });
+
+      // Crossing the 1↔many local-source boundary changes the effective data
+      // source (single-context ↔ aggregate): refetch the view. Aggregate mode
+      // no longer depends on sourceFilter, so this keys purely on the count.
+      const nextLocalCount = result.filter((ctx) => ctx.type === 'local').length;
+      const wasAggregate = prevLocalCount > 1;
+      const isAggregate = nextLocalCount > 1;
+      if (wasAggregate !== isAggregate) {
+        const state = get();
+        if (state.viewMode === 'grouped') {
+          void state.fetchRepositoryGroups();
+        } else {
+          void state.fetchProjects();
+        }
+        if (state.selectedProjectId) {
+          void state.fetchSessionsInitial(state.selectedProjectId);
+        }
+      }
     } catch (error) {
       console.error('[contextSlice] Failed to fetch available contexts:', error);
       // Fallback to local-only
       set({ availableContexts: [{ id: 'local', type: 'local' }] });
     }
+  },
+
+  // Set the sidebar source filter. Pure client-side view filter: the aggregate
+  // data is already the full merged set, so switching the chip only changes
+  // what the lists render (see projectMatchesSource / sessionMatchesSource).
+  // No context switch, no refetch, no loading spinner.
+  setSourceFilter: (filter: SourceFilter) => {
+    if (filter === get().sourceFilter) return;
+    set({ sourceFilter: filter });
   },
 
   // Switch to a different context
@@ -291,15 +357,22 @@ export const createContextSlice: StateCreator<AppState, [], [], ContextSlice> = 
 
     try {
       // Step 1: Save current snapshot + load target snapshot + switch main process
-      // These are independent — run in parallel for speed
-      const currentSnapshot = captureSnapshot(state, state.activeContextId);
+      // These are independent — run in parallel for speed.
+      // In aggregate ("All") mode the store holds merged cross-backend data,
+      // not the active context's own state — never persist it as a snapshot.
+      const currentSnapshot =
+        state.sourceFilter === 'all' ? null : captureSnapshot(state, state.activeContextId);
       const [, targetSnapshot] = await Promise.all([
-        contextStorage.saveSnapshot(state.activeContextId, currentSnapshot),
+        currentSnapshot
+          ? contextStorage.saveSnapshot(state.activeContextId, currentSnapshot)
+          : Promise.resolve(),
         contextStorage.loadSnapshot(targetContextId),
         api.context.switch(targetContextId),
       ]);
 
-      // Step 2: Apply cached snapshot immediately for instant visual feedback
+      // Update dataBackend label from the target context metadata.
+      const targetContext = state.availableContexts.find((ctx) => ctx.id === targetContextId);
+      const nextDataBackend = targetContext?.backend ?? state.dataBackend;
       if (targetSnapshot) {
         set({
           projects: targetSnapshot.projects,
@@ -324,6 +397,7 @@ export const createContextSlice: StateCreator<AppState, [], [], ContextSlice> = 
           sidebarCollapsed: targetSnapshot.sidebarCollapsed,
           // Finalize switch — overlay disappears, user sees cached data instantly
           activeContextId: targetContextId,
+          dataBackend: nextDataBackend,
           isContextSwitching: false,
           targetContextId: null,
         });
@@ -359,6 +433,7 @@ export const createContextSlice: StateCreator<AppState, [], [], ContextSlice> = 
             projects: freshProjects,
             repositoryGroups: freshRepoGroups,
             activeContextId: targetContextId,
+            dataBackend: nextDataBackend,
             isContextSwitching: false,
             targetContextId: null,
           });
@@ -371,6 +446,7 @@ export const createContextSlice: StateCreator<AppState, [], [], ContextSlice> = 
           set({
             ...getEmptyContextState(),
             activeContextId: targetContextId,
+            dataBackend: nextDataBackend,
             isContextSwitching: false,
             targetContextId: null,
           });

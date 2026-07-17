@@ -31,6 +31,20 @@ export interface MockElectronAPI {
   getRepositoryGroups: ReturnType<typeof vi.fn>;
   getWorktreeSessions: ReturnType<typeof vi.fn>;
   getSubagentDetail: ReturnType<typeof vi.fn>;
+  // Aggregate (cross-backend) APIs
+  getAllProjects: ReturnType<typeof vi.fn<() => Promise<Project[]>>>;
+  getAllRepositoryGroups: ReturnType<typeof vi.fn>;
+  getAllSessions: ReturnType<typeof vi.fn<(projectId: string) => Promise<Session[]>>>;
+  getSessionDetailByContext: ReturnType<typeof vi.fn>;
+  getWaterfallDataByContext: ReturnType<typeof vi.fn>;
+  getAggregateMetrics: ReturnType<typeof vi.fn>;
+  // Context API
+  context: {
+    list: ReturnType<typeof vi.fn>;
+    getActive: ReturnType<typeof vi.fn>;
+    switch: ReturnType<typeof vi.fn>;
+    onChanged: ReturnType<typeof vi.fn>;
+  };
   searchSessions: ReturnType<typeof vi.fn>;
   readClaudeMdFiles: ReturnType<typeof vi.fn>;
   readDirectoryClaudeMd: ReturnType<typeof vi.fn>;
@@ -53,6 +67,7 @@ export interface MockElectronAPI {
   };
   onFileChange: ReturnType<typeof vi.fn>;
   onTodoChange: ReturnType<typeof vi.fn>;
+  onContextFileChange: ReturnType<typeof vi.fn>;
   config: {
     get: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
@@ -74,6 +89,10 @@ export interface MockElectronAPI {
     openInEditor: ReturnType<typeof vi.fn>;
     pinSession: ReturnType<typeof vi.fn>;
     unpinSession: ReturnType<typeof vi.fn>;
+    setSessionAnnotation: ReturnType<typeof vi.fn>;
+    removeSessionAnnotation: ReturnType<typeof vi.fn>;
+    addSavedView: ReturnType<typeof vi.fn>;
+    removeSavedView: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -94,6 +113,26 @@ export function createMockElectronAPI(): MockElectronAPI {
     getRepositoryGroups: vi.fn().mockResolvedValue([]),
     getWorktreeSessions: vi.fn().mockResolvedValue([]),
     getSubagentDetail: vi.fn().mockResolvedValue(null),
+    // Aggregate (cross-backend) APIs
+    getAllProjects: vi.fn().mockResolvedValue([]),
+    getAllRepositoryGroups: vi.fn().mockResolvedValue([]),
+    getAllSessions: vi.fn().mockResolvedValue([]),
+    getSessionDetailByContext: vi.fn().mockResolvedValue(null),
+    getWaterfallDataByContext: vi.fn().mockResolvedValue(null),
+    getAggregateMetrics: vi.fn().mockResolvedValue({
+      totals: { sessions: 0, messages: 0, tokens: 0, projects: 0 },
+      daily: [],
+      byBackend: [],
+      byProject: [],
+      generatedAt: Date.now(),
+    }),
+    // Context API
+    context: {
+      list: vi.fn().mockResolvedValue([{ id: 'local', type: 'local', backend: 'claude' }]),
+      getActive: vi.fn().mockResolvedValue('local'),
+      switch: vi.fn().mockResolvedValue({ contextId: 'local' }),
+      onChanged: vi.fn().mockReturnValue(() => undefined),
+    },
     searchSessions: vi.fn().mockResolvedValue({
       results: [],
       totalMatches: 0,
@@ -126,6 +165,7 @@ export function createMockElectronAPI(): MockElectronAPI {
     },
     onFileChange: vi.fn().mockReturnValue(() => undefined),
     onTodoChange: vi.fn().mockReturnValue(() => undefined),
+    onContextFileChange: vi.fn().mockReturnValue(() => undefined),
     config: {
       get: vi.fn().mockResolvedValue({
         notifications: {
@@ -151,6 +191,9 @@ export function createMockElectronAPI(): MockElectronAPI {
         },
         sessions: {
           pinnedSessions: {},
+          hiddenSessions: {},
+          sessionAnnotations: {},
+          savedViews: [],
         },
       }),
       update: vi.fn(),
@@ -176,6 +219,10 @@ export function createMockElectronAPI(): MockElectronAPI {
       openInEditor: vi.fn(),
       pinSession: vi.fn(),
       unpinSession: vi.fn(),
+      setSessionAnnotation: vi.fn(),
+      removeSessionAnnotation: vi.fn(),
+      addSavedView: vi.fn(),
+      removeSavedView: vi.fn(),
     },
   };
 }

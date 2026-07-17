@@ -7,6 +7,7 @@
 import React from 'react';
 
 import { CodeBlockViewer, MarkdownViewer } from '@renderer/components/chat/viewers';
+import { useT } from '@renderer/i18n';
 
 import type { LinkedToolItem } from '@renderer/types/groups';
 
@@ -15,6 +16,7 @@ interface ReadToolViewerProps {
 }
 
 export const ReadToolViewer: React.FC<ReadToolViewerProps> = ({ linkedTool }) => {
+  const t = useT();
   const filePath = linkedTool.input.file_path as string;
 
   // Prefer enriched toolUseResult data
@@ -71,7 +73,7 @@ export const ReadToolViewer: React.FC<ReadToolViewerProps> = ({ linkedTool }) =>
               border: '1px solid var(--tag-border)',
             }}
           >
-            Code
+            {t('chat.viewer.code')}
           </button>
           <button
             type="button"
@@ -83,12 +85,12 @@ export const ReadToolViewer: React.FC<ReadToolViewerProps> = ({ linkedTool }) =>
               border: '1px solid var(--tag-border)',
             }}
           >
-            Preview
+            {t('chat.viewer.preview')}
           </button>
         </div>
       )}
       {isMarkdownFile && viewMode === 'preview' ? (
-        <MarkdownViewer content={content} label="Markdown Preview" copyable />
+        <MarkdownViewer content={content} label={t('chat.viewer.markdownPreview')} copyable />
       ) : (
         <CodeBlockViewer
           fileName={filePath}

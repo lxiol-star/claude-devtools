@@ -25,7 +25,7 @@ import {
 
 import { coercePageLimit, validateProjectId, validateSessionId } from './guards';
 
-import type { ServiceContextRegistry } from '../services';
+import type { ServiceContextRegistry, SessionDetailServices } from '../services';
 import type { WaterfallData } from '@shared/types';
 
 const logger = createLogger('IPC:sessions');
@@ -211,89 +211,108 @@ async function handleGetSessionDetail(
       return null;
     }
 
-    const { projectScanner, sessionParser, subagentResolver, chunkBuilder, dataCache } =
-      registry.getActive();
-
-    const safeProjectId = validatedProject.value!;
-    const safeSessionId = validatedSession.value!;
-    const cacheKey = DataCache.buildKey(safeProjectId, safeSessionId);
-
-    // Stat the JSONL file so we can fingerprint the cache entry.
-    // Without this, a missed FileWatcher event leaves a stale cache entry
-    // that survives manual refresh for up to 10 minutes (the TTL).
-    let fingerprint: string | undefined;
-    try {
-      const filePath = projectScanner.getSessionPath(safeProjectId, safeSessionId);
-      const stats = await projectScanner.getFileSystemProvider().stat(filePath);
-      fingerprint = `${stats.mtimeMs}-${stats.size}`;
-    } catch {
-      // Stat failure is non-fatal — fall through to the existence check below.
-    }
-
-    // Short-circuit: if the renderer's last-known fingerprint matches the
-    // current file state, skip cache lookup, parsing, and IPC payload entirely.
-    // This bounds the cost of frequent no-op refreshes (file-watcher noise,
-    // adaptive debounce on long sessions) to one stat() + a tiny sentinel.
-    // Only honored when the stat succeeded — a missing fingerprint means we
-    // can't prove the file is unchanged, so we fall through to the full path.
-    if (
-      knownFingerprint !== undefined &&
-      fingerprint !== undefined &&
-      knownFingerprint === fingerprint
-    ) {
-      return { unchanged: true, fingerprint };
-    }
-
-    // Check cache first (returns undefined if fingerprint mismatches)
-    let sessionDetail = dataCache.get(cacheKey, fingerprint);
-
-    if (!sessionDetail) {
-      const fsType = projectScanner.getFileSystemProvider().type;
-      // In SSH mode, avoid an extra deep metadata scan before full parse.
-      const session = await projectScanner.getSessionWithOptions(safeProjectId, safeSessionId, {
-        metadataLevel: fsType === 'ssh' ? 'light' : 'deep',
-      });
-      if (!session) {
-        logger.error(`Session not found: ${sessionId}`);
-        return null;
-      }
-
-      // Parse session messages
-      const parsedSession = await sessionParser.parseSession(safeProjectId, safeSessionId);
-
-      // Resolve subagents
-      const subagents = await subagentResolver.resolveSubagents(
-        safeProjectId,
-        safeSessionId,
-        parsedSession.taskCalls,
-        parsedSession.messages
-      );
-      session.hasSubagents = subagents.length > 0;
-
-      // Build session detail with chunks
-      sessionDetail = chunkBuilder.buildSessionDetail(session, parsedSession.messages, subagents);
-
-      // Cache the result (paired with the fingerprint we observed pre-parse).
-      // If the file changed mid-parse, the next get() will see a newer mtime
-      // and re-fetch — at worst we serve one slightly-stale read.
-      dataCache.set(cacheKey, sessionDetail, fingerprint);
-    }
-
-    // Strip raw messages before IPC transfer — the renderer never uses them.
-    // Only chunks (with semantic steps) and process summaries cross the boundary.
-    // This cuts IPC serialization + renderer heap by ~50-60%.
-    // The fingerprint travels with the payload so the renderer can cache it
-    // and pass it back on the next refresh.
-    return {
-      ...sessionDetail,
-      messages: [],
-      processes: sessionDetail.processes.map((p) => ({ ...p, messages: [] })),
-      fingerprint,
-    };
+    return await fetchSessionDetail(
+      registry.getActive(),
+      validatedProject.value!,
+      validatedSession.value!,
+      knownFingerprint
+    );
   } catch (error) {
     logger.error(`Error in get-session-detail for ${projectId}/${sessionId}:`, error);
     return null;
   }
+}
+
+/**
+ * Fetches full session detail (parsed chunks + subagents) from an explicit set
+ * of context services, with fingerprint-based cache validation and the
+ * unchanged-sentinel short-circuit. Shared by the active-context handler and
+ * the aggregate 'get-session-detail-by-context' handler.
+ *
+ * Note: raw messages are stripped from the returned payload — the renderer
+ * never uses them, and this cuts IPC serialization + renderer heap by ~50-60%.
+ */
+export async function fetchSessionDetail(
+  services: SessionDetailServices,
+  projectId: string,
+  sessionId: string,
+  knownFingerprint?: string
+): Promise<SessionDetailResponse | null> {
+  const { projectScanner, sessionParser, subagentResolver, chunkBuilder, dataCache } = services;
+  const cacheKey = DataCache.buildKey(projectId, sessionId);
+
+  // Stat the JSONL file so we can fingerprint the cache entry.
+  // Without this, a missed FileWatcher event leaves a stale cache entry
+  // that survives manual refresh for up to 10 minutes (the TTL).
+  let fingerprint: string | undefined;
+  try {
+    const filePath = await projectScanner.getSessionPath(projectId, sessionId);
+    const stats = await projectScanner.getFileSystemProvider().stat(filePath);
+    fingerprint = `${stats.mtimeMs}-${stats.size}`;
+  } catch {
+    // Stat failure is non-fatal — fall through to the existence check below.
+  }
+
+  // Short-circuit: if the renderer's last-known fingerprint matches the
+  // current file state, skip cache lookup, parsing, and IPC payload entirely.
+  // This bounds the cost of frequent no-op refreshes (file-watcher noise,
+  // adaptive debounce on long sessions) to one stat() + a tiny sentinel.
+  // Only honored when the stat succeeded — a missing fingerprint means we
+  // can't prove the file is unchanged, so we fall through to the full path.
+  if (
+    knownFingerprint !== undefined &&
+    fingerprint !== undefined &&
+    knownFingerprint === fingerprint
+  ) {
+    return { unchanged: true, fingerprint };
+  }
+
+  // Check cache first (returns undefined if fingerprint mismatches)
+  let sessionDetail = dataCache.get(cacheKey, fingerprint);
+
+  if (!sessionDetail) {
+    const fsType = projectScanner.getFileSystemProvider().type;
+    // In SSH mode, avoid an extra deep metadata scan before full parse.
+    const session = await projectScanner.getSessionWithOptions(projectId, sessionId, {
+      metadataLevel: fsType === 'ssh' ? 'light' : 'deep',
+    });
+    if (!session) {
+      logger.error(`Session not found: ${sessionId}`);
+      return null;
+    }
+
+    // Parse session messages
+    const parsedSession = await sessionParser.parseSession(projectId, sessionId);
+
+    // Resolve subagents
+    const subagents = await subagentResolver.resolveSubagents(
+      projectId,
+      sessionId,
+      parsedSession.taskCalls,
+      parsedSession.messages
+    );
+    session.hasSubagents = subagents.length > 0;
+
+    // Build session detail with chunks
+    sessionDetail = chunkBuilder.buildSessionDetail(session, parsedSession.messages, subagents);
+
+    // Cache the result (paired with the fingerprint we observed pre-parse).
+    // If the file changed mid-parse, the next get() will see a newer mtime
+    // and re-fetch — at worst we serve one slightly-stale read.
+    dataCache.set(cacheKey, sessionDetail, fingerprint);
+  }
+
+  // Strip raw messages before IPC transfer — the renderer never uses them.
+  // Only chunks (with semantic steps) and process summaries cross the boundary.
+  // This cuts IPC serialization + renderer heap by ~50-60%.
+  // The fingerprint travels with the payload so the renderer can cache it
+  // and pass it back on the next refresh.
+  return {
+    ...sessionDetail,
+    messages: [],
+    processes: sessionDetail.processes.map((p) => ({ ...p, messages: [] })),
+    fingerprint,
+  };
 }
 
 /**

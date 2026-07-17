@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { TOOL_ITEM_MUTED } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { getTriggerColorDef, type TriggerColor } from '@shared/constants/triggerColors';
 import { ChevronRight } from 'lucide-react';
 
@@ -21,7 +22,7 @@ interface BaseItemProps {
   summary?: string;
   /** Token count to display */
   tokenCount?: number;
-  /** Label for tokens (default: "tokens") */
+  /** Label for tokens (default: localized "tokens") */
   tokenLabel?: string;
   /** Status indicator (green/red/gray dot) */
   status?: ItemStatus;
@@ -77,7 +78,7 @@ export const BaseItem: React.FC<BaseItemProps> = ({
   label,
   summary,
   tokenCount,
-  tokenLabel = 'tokens',
+  tokenLabel,
   status,
   durationMs,
   onClick,
@@ -88,6 +89,7 @@ export const BaseItem: React.FC<BaseItemProps> = ({
   notificationDotColor,
   children,
 }) => {
+  const t = useT();
   return (
     <div
       className={`rounded transition-[background-color,box-shadow] duration-300 ${highlightClasses}`}
@@ -147,7 +149,9 @@ export const BaseItem: React.FC<BaseItemProps> = ({
               backgroundColor: 'var(--tool-item-badge-bg)',
             }}
           >
-            ~{formatTokens(tokenCount)} {tokenLabel}
+            {tokenLabel
+              ? `~${formatTokens(tokenCount)} ${tokenLabel}`
+              : t('chat.tokens', { count: formatTokens(tokenCount) })}
           </span>
         )}
 

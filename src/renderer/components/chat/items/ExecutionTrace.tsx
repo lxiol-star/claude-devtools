@@ -9,6 +9,7 @@ import {
   TOOL_CALL_BORDER,
   TOOL_CALL_TEXT,
 } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { truncateText } from '@renderer/utils/aiGroupEnhancer';
 import { formatTokensCompact } from '@renderer/utils/formatters';
 import { format } from 'date-fns';
@@ -55,6 +56,7 @@ export const ExecutionTrace: React.FC<ExecutionTraceProps> = React.memo(function
   searchExpandedItemId,
   registerToolRef,
 }): React.JSX.Element {
+  const t = useT();
   const [manualExpandedItemId, setManualExpandedItemId] = useState<string | null>(null);
 
   // Use searchExpandedItemId if set, otherwise use manually expanded item
@@ -67,7 +69,7 @@ export const ExecutionTrace: React.FC<ExecutionTraceProps> = React.memo(function
   if (!items || items.length === 0) {
     return (
       <div className="px-3 py-2 text-xs" style={{ color: CARD_ICON_MUTED }}>
-        No execution items
+        {t('chat.empty.noExecutionItems')}
       </div>
     );
   }
@@ -153,7 +155,9 @@ export const ExecutionTrace: React.FC<ExecutionTraceProps> = React.memo(function
                 className="px-2 py-1 text-xs"
                 style={{ color: CARD_ICON_MUTED }}
               >
-                Nested: {item.subagent.description ?? item.subagent.id}
+                {t('chat.subagent.nested', {
+                  name: item.subagent.description ?? item.subagent.id,
+                })}
               </div>
             );
 
@@ -164,7 +168,7 @@ export const ExecutionTrace: React.FC<ExecutionTraceProps> = React.memo(function
               <BaseItem
                 key={itemId}
                 icon={<MailOpen className="size-4" />}
-                label="Input"
+                label={t('chat.input')}
                 summary={truncateText(item.content, 80)}
                 tokenCount={item.tokenCount}
                 onClick={() => handleItemClick(itemId)}
@@ -214,7 +218,7 @@ export const ExecutionTrace: React.FC<ExecutionTraceProps> = React.memo(function
                     <Layers size={14} />
                   </div>
                   <span className="shrink-0 text-xs font-medium" style={{ color: TOOL_CALL_TEXT }}>
-                    Compacted
+                    {t('chat.compact.label')}
                   </span>
                   {item.tokenDelta && (
                     <span
@@ -225,7 +229,9 @@ export const ExecutionTrace: React.FC<ExecutionTraceProps> = React.memo(function
                       {formatTokensCompact(item.tokenDelta.postCompactionTokens)}
                       <span style={{ color: '#4ade80' }}>
                         {' '}
-                        ({formatTokensCompact(Math.abs(item.tokenDelta.delta))} freed)
+                        {t('chat.compact.freed', {
+                          tokens: formatTokensCompact(Math.abs(item.tokenDelta.delta)),
+                        })}
                       </span>
                     </span>
                   )}
@@ -236,7 +242,7 @@ export const ExecutionTrace: React.FC<ExecutionTraceProps> = React.memo(function
                       color: '#818cf8',
                     }}
                   >
-                    Phase {item.phaseNumber}
+                    {t('chat.phase', { number: item.phaseNumber })}
                   </span>
                   <span
                     className="ml-auto shrink-0 text-[11px]"

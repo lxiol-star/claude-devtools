@@ -3,11 +3,14 @@
  *
  * Shows active workspace (Local or SSH host) with connection status badge.
  * Clicking opens an upward dropdown to switch between available workspaces.
- * Only renders when multiple contexts are available (hidden in local-only mode).
+ * Only renders when multiple workspace contexts exist (hidden in local-only mode).
+ * Secondary local contexts (local-{backend}) are not listed here — switching
+ * between local data sources is done via the sidebar source filter chips.
  */
 
 import { useEffect, useRef, useState } from 'react';
 
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { Check, ChevronDown } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -15,6 +18,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { ConnectionStatusBadge } from './ConnectionStatusBadge';
 
 export const WorkspaceIndicator = (): React.JSX.Element | null => {
+  const t = useT();
   const { activeContextId, isContextSwitching, availableContexts, switchContext } = useStore(
     useShallow((s) => ({
       activeContextId: s.activeContextId,
@@ -49,11 +53,23 @@ export const WorkspaceIndicator = (): React.JSX.Element | null => {
     return () => document.removeEventListener('keydown', handleEscape);
   }, []);
 
-  // Only show when multiple contexts exist
-  if (availableContexts.length <= 1) return null;
+  // Only show when multiple contexts exist. Secondary local contexts
+  // ('local-claude'/'local-kimi'/'local-codex') are excluded: switching between
+  // local data sources is handled by the sidebar source filter chips, while this
+  // indicator covers local-machine vs SSH workspaces.
+  const workspaceContexts = availableContexts.filter((ctx) => !ctx.id.startsWith('local-'));
+  if (workspaceContexts.length <= 1) return null;
 
   const getContextLabel = (contextId: string): string => {
-    if (contextId === 'local') return 'Local';
+    if (contextId === 'local') return t('layout.local');
+    // Active context may be a secondary local backend (selected via source chips):
+    // show a friendly backend name instead of the raw context id.
+    if (contextId.startsWith('local-')) {
+      const backend = contextId.slice('local-'.length);
+      const sourceKey = `layout.source.${backend}`;
+      const label = t(sourceKey);
+      return label === sourceKey ? contextId : label;
+    }
     return contextId.startsWith('ssh-') ? contextId.slice(4) : contextId;
   };
 
@@ -109,12 +125,17 @@ export const WorkspaceIndicator = (): React.JSX.Element | null => {
               className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider"
               style={{ color: 'var(--color-text-muted)' }}
             >
-              Switch Workspace
+              {t('layout.switchWorkspace')}
             </div>
 
             {/* Context list */}
-            {availableContexts.map((ctx) => {
-              const isSelected = ctx.id === activeContextId;
+            {workspaceContexts.map((ctx) => {
+              // 'local' represents the whole local machine: it is considered
+              // selected when any local context (primary or secondary) is active.
+              const isSelected =
+                ctx.id === 'local'
+                  ? activeContextId === 'local' || activeContextId.startsWith('local-')
+                  : ctx.id === activeContextId;
               const label = getContextLabel(ctx.id);
 
               return (

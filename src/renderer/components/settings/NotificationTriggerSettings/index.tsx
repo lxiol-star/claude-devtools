@@ -9,6 +9,8 @@
  * 4. Advanced (collapsible)
  */
 
+import { useT } from '@renderer/i18n';
+
 import { AddTriggerForm } from './components/AddTriggerForm';
 import { SectionHeader } from './components/SectionHeader';
 import { TriggerCard } from './components/TriggerCard';
@@ -28,19 +30,20 @@ export const NotificationTriggerSettings = ({
   onAddTrigger,
   onRemoveTrigger,
 }: Readonly<NotificationTriggerSettingsProps>): React.JSX.Element => {
+  const t = useT();
+
   // Separate builtin and custom triggers
-  const builtinTriggers = triggers.filter((t) => t.isBuiltin);
-  const customTriggers = triggers.filter((t) => !t.isBuiltin);
+  const builtinTriggers = triggers.filter((trigger) => trigger.isBuiltin);
+  const customTriggers = triggers.filter((trigger) => !trigger.isBuiltin);
 
   return (
     <div className="space-y-8">
       {/* Builtin Triggers */}
       {builtinTriggers.length > 0 && (
         <div>
-          <SectionHeader title="Built-in Triggers" />
+          <SectionHeader title={t('settings.notifications.builtinTriggers')} />
           <p className="mb-4 text-xs text-text-muted">
-            Default triggers that come with the application. You can enable/disable them and
-            customize their patterns.
+            {t('settings.notifications.builtinTriggersDesc')}
           </p>
           <div>
             {builtinTriggers.map((trigger) => (
@@ -58,9 +61,9 @@ export const NotificationTriggerSettings = ({
 
       {/* Custom Triggers */}
       <div>
-        <SectionHeader title="Custom Triggers" />
+        <SectionHeader title={t('settings.notifications.customTriggers')} />
         <p className="mb-4 text-xs text-text-muted">
-          Create your own triggers to get notified for specific patterns or tool outputs.
+          {t('settings.notifications.customTriggersDesc')}
         </p>
 
         {customTriggers.length > 0 && (
@@ -78,7 +81,9 @@ export const NotificationTriggerSettings = ({
         )}
 
         {customTriggers.length === 0 && (
-          <p className="mb-4 text-sm italic text-text-muted">No custom triggers configured yet.</p>
+          <p className="mb-4 text-sm italic text-text-muted">
+            {t('settings.notifications.noCustomTriggers')}
+          </p>
         )}
 
         <AddTriggerForm saving={saving} onAdd={onAddTrigger} />

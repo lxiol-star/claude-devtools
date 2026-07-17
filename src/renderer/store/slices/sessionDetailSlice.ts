@@ -121,7 +121,12 @@ export interface SessionDetailSlice {
   tabSessionData: Record<string, TabSessionData>;
 
   // Actions
-  fetchSessionDetail: (projectId: string, sessionId: string, tabId?: string) => Promise<void>;
+  fetchSessionDetail: (
+    projectId: string,
+    sessionId: string,
+    tabId?: string,
+    contextId?: string
+  ) => Promise<void>;
   /** Refresh session without loading states or UI resets - for real-time updates */
   refreshSessionInPlace: (projectId: string, sessionId: string) => Promise<void>;
   setVisibleAIGroup: (aiGroupId: string | null) => void;
@@ -162,8 +167,10 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
   // Per-tab session data
   tabSessionData: {},
 
-  // Fetch full session detail with chunks and subagents
-  fetchSessionDetail: async (projectId: string, sessionId: string, tabId?: string) => {
+  // Fetch full session detail with chunks and subagents.
+  // contextId identifies the origin backend in aggregate ("All") mode — the
+  // detail is then loaded from that context instead of the active one.
+  fetchSessionDetail: async (projectId: string, sessionId: string, tabId?: string, contextId?: string) => {
     const requestGeneration = ++sessionDetailFetchGeneration;
     set({
       sessionDetailLoading: true,
@@ -189,7 +196,9 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
     try {
       // Initial load — never pass knownFingerprint, so an `unchanged` sentinel
       // cannot be returned at runtime. Narrow defensively for type safety.
-      const response = await api.getSessionDetail(projectId, sessionId);
+      const response = contextId
+        ? await api.getSessionDetailByContext({ contextId, sessionId, projectId })
+        : await api.getSessionDetail(projectId, sessionId);
       if (requestGeneration !== sessionDetailFetchGeneration) {
         return;
       }
@@ -197,7 +206,9 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
 
       // Capture file fingerprint so future refreshes can short-circuit when
       // the file is unchanged.
-      const refreshKey = `${projectId}/${sessionId}`;
+      const refreshKey = contextId
+        ? `${contextId}:${projectId}/${sessionId}`
+        : `${projectId}/${sessionId}`;
       if (detail?.fingerprint) {
         sessionFileFingerprint.set(refreshKey, detail.fingerprint);
       }
@@ -554,7 +565,21 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
       return;
     }
 
-    const refreshKey = `${projectId}/${sessionId}`;
+    // Resolve the origin context of the viewed session (aggregate "All" mode
+    // tags tabs/sessions with contextId). Prefer a tab belonging to the active
+    // context — file-watch events always originate there — then any viewing
+    // tab, then the sidebar session list.
+    const viewingTab =
+      tabsViewingSession.find((t) => !t.contextId || t.contextId === currentState.activeContextId) ??
+      tabsViewingSession[0];
+    const tabContextId =
+      viewingTab?.contextId ??
+      currentState.sessions.find((s) => s.id === sessionId)?.contextId ??
+      undefined;
+
+    const refreshKey = tabContextId
+      ? `${tabContextId}:${projectId}/${sessionId}`
+      : `${projectId}/${sessionId}`;
 
     // Coalesce duplicate in-flight refreshes for the same session.
     if (sessionRefreshInFlight.has(refreshKey)) {
@@ -569,9 +594,12 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
       // Pass the last-known file fingerprint so main can short-circuit when
       // the file hasn't changed. This is the primary fix for the perf
       // regression where rapid refreshes paid full IPC + transformation cost
-      // even when nothing on disk had changed.
-      const knownFingerprint = sessionFileFingerprint.get(refreshKey);
-      const response = await api.getSessionDetail(projectId, sessionId, knownFingerprint);
+      // even when nothing on disk had changed. Cross-context loads don't
+      // support fingerprinting (always a full fetch).
+      const knownFingerprint = tabContextId ? undefined : sessionFileFingerprint.get(refreshKey);
+      const response = tabContextId
+        ? await api.getSessionDetailByContext({ contextId: tabContextId, sessionId, projectId })
+        : await api.getSessionDetail(projectId, sessionId, knownFingerprint);
 
       // Drop stale responses if a newer refresh started while this one was in flight.
       if (sessionRefreshGeneration.get(refreshKey) !== generation) {

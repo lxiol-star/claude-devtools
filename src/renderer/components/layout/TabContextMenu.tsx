@@ -7,6 +7,7 @@
 
 import { useEffect, useRef } from 'react';
 
+import { useT } from '@renderer/i18n';
 import { formatShortcut } from '@renderer/utils/stringUtils';
 
 interface TabContextMenuProps {
@@ -56,6 +57,7 @@ export const TabContextMenu = ({
   onToggleHide,
   onRename,
 }: TabContextMenuProps): React.JSX.Element => {
+  const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close on click-outside and Escape
@@ -101,44 +103,52 @@ export const TabContextMenu = ({
     >
       {selectedCount > 1 && onCloseSelectedTabs ? (
         <MenuItem
-          label={`Close ${selectedCount} Tabs`}
+          label={t('layout.closeNTabs', { count: selectedCount })}
           onClick={handleClick(onCloseSelectedTabs)}
         />
       ) : (
-        <MenuItem label="Close Tab" shortcut={formatShortcut('W')} onClick={handleClick(onCloseTab)} />
+        <MenuItem
+          label={t('layout.closeTab')}
+          shortcut={formatShortcut('W')}
+          onClick={handleClick(onCloseTab)}
+        />
       )}
-      <MenuItem label="Close Other Tabs" onClick={handleClick(onCloseOtherTabs)} />
+      <MenuItem label={t('layout.closeOtherTabs')} onClick={handleClick(onCloseOtherTabs)} />
       <div className="mx-2 my-1 border-t" style={{ borderColor: 'var(--color-border)' }} />
       <MenuItem
-        label="Split Right"
+        label={t('layout.splitRight')}
         shortcut={formatShortcut('\\')}
         onClick={handleClick(onSplitRight)}
         disabled={disableSplit}
       />
-      <MenuItem label="Split Left" onClick={handleClick(onSplitLeft)} disabled={disableSplit} />
+      <MenuItem
+        label={t('layout.splitLeft')}
+        onClick={handleClick(onSplitLeft)}
+        disabled={disableSplit}
+      />
       {isSessionTab && onTogglePin && (
         <>
           <div className="mx-2 my-1 border-t" style={{ borderColor: 'var(--color-border)' }} />
           <MenuItem
-            label={isPinned ? 'Unpin from Sidebar' : 'Pin to Sidebar'}
+            label={isPinned ? t('layout.unpinFromSidebar') : t('layout.pinToSidebar')}
             onClick={handleClick(onTogglePin)}
           />
         </>
       )}
       {isSessionTab && onToggleHide && (
         <MenuItem
-          label={isHidden ? 'Unhide from Sidebar' : 'Hide from Sidebar'}
+          label={isHidden ? t('layout.unhideFromSidebar') : t('layout.hideFromSidebar')}
           onClick={handleClick(onToggleHide)}
         />
       )}
       {onRename && (
         <>
           <div className="mx-2 my-1 border-t" style={{ borderColor: 'var(--color-border)' }} />
-          <MenuItem label="Rename Tab" onClick={handleClick(onRename)} />
+          <MenuItem label={t('layout.renameTab')} onClick={handleClick(onRename)} />
         </>
       )}
       <div className="mx-2 my-1 border-t" style={{ borderColor: 'var(--color-border)' }} />
-      <MenuItem label="Close All Tabs" shortcut={formatShortcut('W', { shift: true })} onClick={handleClick(onCloseAllTabs)} />
+      <MenuItem label={t('layout.closeAllTabs')} shortcut={formatShortcut('W', { shift: true })} onClick={handleClick(onCloseAllTabs)} />
     </div>
   );
 };

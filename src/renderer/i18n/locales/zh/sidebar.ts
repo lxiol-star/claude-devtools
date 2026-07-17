@@ -1,0 +1,57 @@
+/** sidebar 分区的中文文案。 */
+export const sidebar: Record<string, string> = {
+  // 会话列表（DateGroupedSessions）
+  'sidebar.selectProjectPrompt': '选择项目以查看会话',
+  'sidebar.loadError': '加载会话失败',
+  'sidebar.noSessions': '未找到会话',
+  'sidebar.noSessionsHint': '该项目暂无会话',
+  'sidebar.sessions': '会话',
+  'sidebar.byContext': '按上下文',
+  'sidebar.loadedSoFar': '已加载 {count} 个会话——向下滚动可加载更多。按上下文排序仅对已加载的会话生效。',
+  'sidebar.exitSelectionMode': '退出选择模式',
+  'sidebar.selectSessions': '选择会话',
+  'sidebar.hideHiddenSessions': '收起隐藏的会话',
+  'sidebar.showHiddenSessions': '显示隐藏的会话',
+  'sidebar.sortByContext': '按上下文消耗排序',
+  'sidebar.sortByRecent': '按最近时间排序',
+  'sidebar.selectedCount': '已选择 {count} 项',
+  'sidebar.pin': '置顶',
+  'sidebar.hide': '隐藏',
+  'sidebar.unhide': '取消隐藏',
+  'sidebar.pinSelected': '置顶所选会话',
+  'sidebar.hideSelected': '隐藏所选会话',
+  'sidebar.unhideSelected': '取消隐藏所选会话',
+  'sidebar.cancelSelection': '取消选择',
+  'sidebar.compare': '对比',
+  'sidebar.compareSelected': '对比所选会话（2-3 个）',
+  'sidebar.pinned': '已置顶',
+  'sidebar.loadingMore': '正在加载更多会话…',
+  'sidebar.scrollToLoadMore': '滚动以加载更多',
+
+  // 日期分组标题（对应 utils/dateGrouping 中的 DateCategory）
+  'sidebar.dateCategory.today': '今天',
+  'sidebar.dateCategory.yesterday': '昨天',
+  'sidebar.dateCategory.previous7Days': '过去 7 天',
+  'sidebar.dateCategory.older': '更早',
+
+  // 会话行（SessionItem）
+  'sidebar.session': '会话',
+  'sidebar.untitled': '未命名会话',
+  'sidebar.totalContextTokens': '总上下文：{count} tokens',
+  'sidebar.contextTokens': '上下文：{count}',
+  'sidebar.phase': '阶段 {number}：',
+  'sidebar.compactedTo': '（已压缩至 {count}）',
+
+  // 右键菜单（SessionContextMenu）
+  'sidebar.openInCurrentPane': '在当前面板打开',
+  'sidebar.openInNewTab': '在新标签页打开',
+  'sidebar.splitRightAndOpen': '拆分至右侧并打开',
+  'sidebar.pinSession': '置顶会话',
+  'sidebar.unpinSession': '取消置顶会话',
+  'sidebar.hideSession': '隐藏会话',
+  'sidebar.unhideSession': '取消隐藏会话',
+  'sidebar.copied': '已复制',
+  'sidebar.copySessionId': '复制会话 ID',
+  'sidebar.copyResumeCommand': '复制恢复命令',
+  'sidebar.click': '点击',
+};

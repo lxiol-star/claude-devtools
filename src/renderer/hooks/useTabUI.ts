@@ -43,6 +43,8 @@ interface UseTabUIReturn {
   expandSubagentTrace: (subagentId: string) => void;
   isContextPanelVisible: boolean;
   setContextPanelVisible: (visible: boolean) => void;
+  isTimelinePanelVisible: boolean;
+  setTimelinePanelVisible: (visible: boolean) => void;
   selectedContextPhase: number | null;
   setSelectedContextPhase: (phase: number | null) => void;
   savedScrollTop: number | undefined;
@@ -82,6 +84,7 @@ export function useTabUI(): UseTabUIReturn {
     toggleSubagentTraceExpansionForTab,
     expandSubagentTraceForTab,
     setContextPanelVisibleForTab,
+    setTimelinePanelVisibleForTab,
     setSelectedContextPhaseForTab,
     saveScrollPositionForTab,
     initTabUIState,
@@ -94,6 +97,7 @@ export function useTabUI(): UseTabUIReturn {
       toggleSubagentTraceExpansionForTab: s.toggleSubagentTraceExpansionForTab,
       expandSubagentTraceForTab: s.expandSubagentTraceForTab,
       setContextPanelVisibleForTab: s.setContextPanelVisibleForTab,
+      setTimelinePanelVisibleForTab: s.setTimelinePanelVisibleForTab,
       setSelectedContextPhaseForTab: s.setSelectedContextPhaseForTab,
       saveScrollPositionForTab: s.saveScrollPositionForTab,
       initTabUIState: s.initTabUIState,
@@ -187,6 +191,17 @@ export function useTabUI(): UseTabUIReturn {
     [tabId, setContextPanelVisibleForTab]
   );
 
+  // Timeline panel - derive directly from tabState (reactive!)
+  const isTimelinePanelVisible = tabState?.showTimelinePanel ?? false;
+
+  const setTimelinePanelVisible = useCallback(
+    (visible: boolean): void => {
+      if (!tabId) return;
+      setTimelinePanelVisibleForTab(tabId, visible);
+    },
+    [tabId, setTimelinePanelVisibleForTab]
+  );
+
   // Context phase selection - derive from tabState
   const selectedContextPhase = tabState?.selectedContextPhase ?? null;
 
@@ -237,6 +252,10 @@ export function useTabUI(): UseTabUIReturn {
     // Context panel
     isContextPanelVisible,
     setContextPanelVisible,
+
+    // Timeline panel
+    isTimelinePanelVisible,
+    setTimelinePanelVisible,
 
     // Context phase selection
     selectedContextPhase,

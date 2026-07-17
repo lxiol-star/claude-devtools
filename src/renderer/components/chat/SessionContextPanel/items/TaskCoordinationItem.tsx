@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 
 import { COLOR_TEXT_MUTED, COLOR_TEXT_SECONDARY } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { ChevronRight, Users } from 'lucide-react';
 
 import { formatTokens } from '../utils/formatting';
@@ -20,6 +21,7 @@ export const TaskCoordinationItem = ({
   injection,
   onNavigateToTurn,
 }: Readonly<TaskCoordinationItemProps>): React.ReactElement => {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const turnIndex = injection.turnIndex;
   const isClickable = onNavigateToTurn && turnIndex >= 0;
@@ -56,15 +58,15 @@ export const TaskCoordinationItem = ({
             }
           }}
         >
-          @Turn {turnIndex + 1}
+          @{t('chat.turn', { turn: turnIndex + 1 })}
         </span>
       ) : (
         <span className="text-xs" style={{ color: COLOR_TEXT_SECONDARY }}>
-          @Turn {turnIndex + 1}
+          @{t('chat.turn', { turn: turnIndex + 1 })}
         </span>
       )}
       <span className="text-xs" style={{ color: COLOR_TEXT_MUTED }}>
-        ~{formatTokens(injection.estimatedTokens)} tokens
+        {t('chat.tokens', { count: formatTokens(injection.estimatedTokens) })}
       </span>
       <span
         className="rounded px-1 py-0.5 text-xs"
@@ -73,7 +75,9 @@ export const TaskCoordinationItem = ({
           color: COLOR_TEXT_MUTED,
         }}
       >
-        {injection.breakdown.length} item{injection.breakdown.length !== 1 ? 's' : ''}
+        {injection.breakdown.length === 1
+          ? t('chat.item.one', { count: injection.breakdown.length })
+          : t('chat.item.other', { count: injection.breakdown.length })}
       </span>
     </>
   );

@@ -15,6 +15,9 @@ import { createLogger } from '@shared/utils/logger';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url)); // eslint-disable-line @typescript-eslint/naming-convention -- CommonJS __dirname shim in ESM
 
 const logger = createLogger('Service:HttpServer');
 

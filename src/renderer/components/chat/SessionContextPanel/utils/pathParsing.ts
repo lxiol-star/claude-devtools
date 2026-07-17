@@ -2,14 +2,17 @@
  * Path parsing utilities for SessionContextPanel.
  */
 
+/** Translate function shape accepted from the i18n hook. */
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
 /**
  * Format the firstSeenInGroup value into a human-readable string.
  * Converts "ai-0" -> "Turn 1", "ai-1" -> "Turn 2", etc.
  */
-export function formatFirstSeen(groupId: string): string {
+export function formatFirstSeen(groupId: string, t: Translate): string {
   const turnIndex = parseTurnIndex(groupId);
   if (turnIndex < 0) return groupId;
-  return `Turn ${turnIndex + 1}`;
+  return t('chat.turn', { turn: turnIndex + 1 });
 }
 
 /**

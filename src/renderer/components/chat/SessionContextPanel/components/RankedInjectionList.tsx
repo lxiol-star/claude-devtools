@@ -10,6 +10,7 @@ import React, { useMemo, useState } from 'react';
 
 import { CopyButton } from '@renderer/components/common/CopyButton';
 import { COLOR_TEXT_MUTED, COLOR_TEXT_SECONDARY } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { ChevronRight } from 'lucide-react';
 
 import { formatTokens } from '../utils/formatting';
@@ -21,13 +22,20 @@ import type { ContextInjection, ToolOutputInjection } from '@renderer/types/cont
 // Constants
 // =============================================================================
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+/** Translate function shape accepted from the i18n hook. */
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
+const CATEGORY_COLORS: Record<
+  string,
+  { bg: string; text: string; labelKey?: string; label?: string }
+> = {
+  // 'CLAUDE.md' is a product file name — kept as a literal, not translated
   'claude-md': { bg: 'rgba(99, 102, 241, 0.15)', text: '#818cf8', label: 'CLAUDE.md' },
-  'mentioned-file': { bg: 'rgba(52, 211, 153, 0.15)', text: '#34d399', label: 'File' },
-  'tool-output': { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24', label: 'Tool' },
-  'thinking-text': { bg: 'rgba(167, 139, 250, 0.15)', text: '#a78bfa', label: 'Thinking' },
-  'task-coordination': { bg: 'rgba(251, 146, 60, 0.15)', text: '#fb923c', label: 'Team' },
-  'user-message': { bg: 'rgba(96, 165, 250, 0.15)', text: '#60a5fa', label: 'User' },
+  'mentioned-file': { bg: 'rgba(52, 211, 153, 0.15)', text: '#34d399', labelKey: 'chat.category.file' },
+  'tool-output': { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24', labelKey: 'chat.category.tool' },
+  'thinking-text': { bg: 'rgba(167, 139, 250, 0.15)', text: '#a78bfa', labelKey: 'chat.category.thinking' },
+  'task-coordination': { bg: 'rgba(251, 146, 60, 0.15)', text: '#fb923c', labelKey: 'chat.category.team' },
+  'user-message': { bg: 'rgba(96, 165, 250, 0.15)', text: '#60a5fa', labelKey: 'chat.category.user' },
 };
 
 // =============================================================================
@@ -45,18 +53,24 @@ interface RankedInjectionListProps {
 // Helpers
 // =============================================================================
 
-function getInjectionDescription(injection: ContextInjection): string {
+function getInjectionDescription(injection: ContextInjection, t: Translate): string {
   switch (injection.category) {
     case 'claude-md':
       return injection.displayName || injection.path;
     case 'mentioned-file':
       return injection.displayName;
     case 'tool-output':
-      return `${injection.toolCount} tool${injection.toolCount !== 1 ? 's' : ''} in Turn ${injection.turnIndex + 1}`;
+      return t('chat.ranked.toolsInTurn', {
+        tools:
+          injection.toolCount === 1
+            ? t('chat.tool.one', { count: injection.toolCount })
+            : t('chat.tool.other', { count: injection.toolCount }),
+        turn: injection.turnIndex + 1,
+      });
     case 'thinking-text':
-      return `Turn ${injection.turnIndex + 1} thinking/text`;
+      return t('chat.ranked.thinkingTextTurn', { turn: injection.turnIndex + 1 });
     case 'task-coordination':
-      return `Turn ${injection.turnIndex + 1} coordination`;
+      return t('chat.ranked.coordinationTurn', { turn: injection.turnIndex + 1 });
     case 'user-message':
       return injection.textPreview;
   }
@@ -97,9 +111,11 @@ const ToolOutputRankedItem = ({
   onNavigateToTurn?: (turnIndex: number) => void;
   onNavigateToTool?: (turnIndex: number, toolUseId: string) => void;
 }>): React.ReactElement => {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const hasBreakdown = injection.toolBreakdown.length > 0;
   const categoryInfo = CATEGORY_COLORS['tool-output'];
+  const categoryLabel = categoryInfo.labelKey ? t(categoryInfo.labelKey) : categoryInfo.label;
 
   const sortedBreakdown = useMemo(
     () => [...injection.toolBreakdown].sort((a, b) => b.tokenCount - a.tokenCount),
@@ -131,11 +147,11 @@ const ToolOutputRankedItem = ({
           className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium"
           style={{ backgroundColor: categoryInfo.bg, color: categoryInfo.text }}
         >
-          {categoryInfo.label}
+          {categoryLabel}
         </span>
         {/* Description */}
         <span className="min-w-0 flex-1 truncate text-xs" style={{ color: COLOR_TEXT_SECONDARY }}>
-          {getInjectionDescription(injection)}
+          {getInjectionDescription(injection, t)}
         </span>
         {/* Token count */}
         <span
@@ -183,7 +199,7 @@ const ToolOutputRankedItem = ({
                     fontSize: '10px',
                   }}
                 >
-                  error
+                  {t('chat.errorBadge')}
                 </span>
               )}
             </button>
@@ -204,6 +220,7 @@ export const RankedInjectionList = ({
   onNavigateToTool,
   onNavigateToUserGroup,
 }: Readonly<RankedInjectionListProps>): React.ReactElement => {
+  const t = useT();
   const sortedInjections = useMemo(
     () => [...injections].sort((a, b) => b.estimatedTokens - a.estimatedTokens),
     [injections]
@@ -227,8 +244,10 @@ export const RankedInjectionList = ({
         const categoryInfo = CATEGORY_COLORS[inj.category] ?? {
           bg: 'rgba(161, 161, 170, 0.15)',
           text: '#a1a1aa',
-          label: inj.category,
         };
+        const categoryLabel = categoryInfo.labelKey
+          ? t(categoryInfo.labelKey)
+          : (categoryInfo.label ?? inj.category);
         const copyPath = getCopyablePath(inj);
 
         const handleClick = (): void => {
@@ -253,14 +272,14 @@ export const RankedInjectionList = ({
                 className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium"
                 style={{ backgroundColor: categoryInfo.bg, color: categoryInfo.text }}
               >
-                {categoryInfo.label}
+                {categoryLabel}
               </span>
               {/* Description */}
               <span
                 className="min-w-0 flex-1 truncate text-xs"
                 style={{ color: COLOR_TEXT_SECONDARY }}
               >
-                {getInjectionDescription(inj)}
+                {getInjectionDescription(inj, t)}
               </span>
               {/* Token count */}
               <span

@@ -3,10 +3,14 @@
  */
 
 import { api } from '@renderer/api';
+import { buildAnnotationKey } from '@shared/utils/annotationKey';
 import { createLogger } from '@shared/utils/logger';
+
+import { isAggregateSourceMode } from './contextSlice';
 
 import type { AppState } from '../types';
 import type { Session, SessionSortMode } from '@renderer/types/data';
+import type { SessionAnnotation } from '@shared/types';
 import type { StateCreator } from 'zustand';
 
 const logger = createLogger('Store:session');
@@ -37,6 +41,8 @@ export interface SessionSlice {
   // Hidden sessions
   hiddenSessionIds: string[];
   showHiddenSessions: boolean;
+  // Session annotations (keyed by composite `${contextId}:${projectId}:${sessionId}`)
+  sessionAnnotations: Record<string, SessionAnnotation>;
   // Multi-select
   sidebarSelectedSessionIds: string[];
   sidebarMultiSelectActive: boolean;
@@ -48,7 +54,7 @@ export interface SessionSlice {
   fetchSessionsInitial: (projectId: string) => Promise<void>;
   fetchSessionsMore: () => Promise<void>;
   resetSessionsPagination: () => void;
-  selectSession: (id: string) => void;
+  selectSession: (id: string, contextId?: string) => void;
   clearSelection: () => void;
   /** Refresh sessions list without loading states - for real-time updates */
   refreshSessionsInPlace: (projectId: string) => Promise<void>;
@@ -66,6 +72,13 @@ export interface SessionSlice {
   unhideMultipleSessions: (sessionIds: string[]) => Promise<void>;
   /** Load hidden sessions from config for current project */
   loadHiddenSessions: () => Promise<void>;
+  /** Set (merge) a session's annotation (optimistic) */
+  setSessionAnnotation: (
+    session: Session,
+    patch: Partial<Pick<SessionAnnotation, 'tags' | 'score' | 'note'>>
+  ) => Promise<void>;
+  /** Load session annotations from config into the local map */
+  loadSessionAnnotations: () => Promise<void>;
   /** Toggle showing hidden sessions in sidebar */
   toggleShowHiddenSessions: () => void;
   /** Toggle one session's checkbox in sidebar multi-select */
@@ -98,6 +111,8 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
   // Hidden sessions
   hiddenSessionIds: [],
   showHiddenSessions: false,
+  // Session annotations
+  sessionAnnotations: {},
   // Multi-select
   sidebarSelectedSessionIds: [],
   sidebarMultiSelectActive: false,
@@ -108,7 +123,10 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
   fetchSessions: async (projectId: string) => {
     set({ sessionsLoading: true, sessionsError: null });
     try {
-      const sessions = await api.getSessions(projectId);
+      // Aggregate ("All") mode merges sessions across all local backends.
+      const sessions = isAggregateSourceMode(get())
+        ? await api.getAllSessions(projectId)
+        : await api.getSessions(projectId);
       // Sort by max of updatedAt/createdAt (descending)
       const sorted = [...sessions].sort(
         (a, b) =>
@@ -126,6 +144,12 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
 
   // Fetch initial page of sessions (paginated)
   fetchSessionsInitial: async (projectId: string) => {
+    const aggregate = isAggregateSourceMode(get());
+    // Capture the cache filter key up front so it matches the fetched data even
+    // if the user switches source mid-flight. In aggregate mode the stored list
+    // is the full merged set (independent of the chip), so it keys under 'all';
+    // the source chip filters it client-side.
+    const filterAtStart = aggregate ? 'all' : get().sourceFilter;
     set({
       sessionsLoading: true,
       sessionsError: null,
@@ -135,6 +159,35 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
       sessionsTotalCount: 0,
     });
     try {
+      if (aggregate) {
+        // Aggregate endpoint returns the full list — no pagination.
+        const sessions = await api.getAllSessions(projectId);
+        set({
+          sessions,
+          sessionsCursor: null,
+          sessionsHasMore: false,
+          sessionsTotalCount: sessions.length,
+          sessionsLoading: false,
+        });
+
+        const cacheProjectId = get().selectedProjectId;
+        if (cacheProjectId) {
+          get()._sessionCache.set(`${filterAtStart}:${cacheProjectId}`, {
+            sessions,
+            cursor: null,
+            hasMore: false,
+            totalCount: sessions.length,
+            timestamp: Date.now(),
+          });
+        }
+
+        void get().loadPinnedSessions();
+        void get().loadHiddenSessions();
+        void get().loadSessionAnnotations();
+        void get().loadSavedViews();
+        return;
+      }
+
       const result = await api.getSessionsPaginated(projectId, null, 20, {
         includeTotalCount: false,
         prefilterAll: false,
@@ -150,7 +203,7 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
 
       const cacheProjectId = get().selectedProjectId;
       if (cacheProjectId) {
-        get()._sessionCache.set(cacheProjectId, {
+        get()._sessionCache.set(`${filterAtStart}:${cacheProjectId}`, {
           sessions: result.sessions,
           cursor: result.nextCursor,
           hasMore: result.hasMore,
@@ -162,6 +215,8 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
       // Load pinned and hidden sessions after fetching session list
       void get().loadPinnedSessions();
       void get().loadHiddenSessions();
+      void get().loadSessionAnnotations();
+      void get().loadSavedViews();
     } catch (error) {
       set({
         sessionsError: error instanceof Error ? error.message : 'Failed to fetch sessions',
@@ -175,8 +230,15 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
     const state = get();
     const { selectedProjectId, sessionsCursor, sessionsHasMore, sessionsLoadingMore } = state;
 
-    // Guard: don't fetch if already loading, no more pages, or no project
-    if (!selectedProjectId || !sessionsHasMore || sessionsLoadingMore || !sessionsCursor) {
+    // Guard: don't fetch if already loading, no more pages, or no project.
+    // Aggregate mode returns the full list up front, so it never paginates.
+    if (
+      !selectedProjectId ||
+      !sessionsHasMore ||
+      sessionsLoadingMore ||
+      !sessionsCursor ||
+      isAggregateSourceMode(state)
+    ) {
       return;
     }
 
@@ -226,8 +288,10 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
     });
   },
 
-  // Select a session and fetch its detail
-  selectSession: (id: string) => {
+  // Select a session and fetch its detail.
+  // contextId identifies the origin backend in aggregate ("All") mode; when
+  // omitted it is looked up from the loaded session list.
+  selectSession: (id: string, contextId?: string) => {
     set({
       selectedSessionId: id,
       sessionDetail: null,
@@ -240,7 +304,9 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
     const projectId = state.selectedProjectId;
     if (projectId) {
       const activeTabId = state.activeTabId ?? undefined;
-      void state.fetchSessionDetail(projectId, id, activeTabId);
+      const resolvedContextId =
+        contextId ?? state.sessions.find((s) => s.id === id)?.contextId ?? undefined;
+      void state.fetchSessionDetail(projectId, id, activeTabId, resolvedContextId);
     } else {
       logger.warn('Cannot fetch session detail: no project selected');
     }
@@ -271,30 +337,42 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
     projectRefreshGeneration.set(projectId, generation);
 
     try {
-      const result = await api.getSessionsPaginated(projectId, null, 20, {
-        includeTotalCount: false,
-        prefilterAll: false,
-        metadataLevel: 'light',
-      });
+      // Aggregate ("All") mode refetches the full merged list (no pagination).
+      const aggregate = isAggregateSourceMode(currentState);
+      const result = aggregate
+        ? {
+            sessions: await api.getAllSessions(projectId),
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 0,
+          }
+        : await api.getSessionsPaginated(projectId, null, 20, {
+            includeTotalCount: false,
+            prefilterAll: false,
+            metadataLevel: 'light',
+          });
 
       // Drop stale responses from older in-flight refreshes
       if (projectRefreshGeneration.get(projectId) !== generation) {
         return;
       }
 
+      const totalCount = aggregate ? result.sessions.length : result.totalCount;
+
       // Update sessions without loading state
       set({
         sessions: result.sessions,
         sessionsCursor: result.nextCursor,
         sessionsHasMore: result.hasMore,
-        sessionsTotalCount: result.totalCount,
+        sessionsTotalCount: totalCount,
       });
 
-      get()._sessionCache.set(projectId, {
+      const cacheFilterKey = aggregate ? 'all' : currentState.sourceFilter;
+      get()._sessionCache.set(`${cacheFilterKey}:${projectId}`, {
         sessions: result.sessions,
         cursor: result.nextCursor,
         hasMore: result.hasMore,
-        totalCount: result.totalCount,
+        totalCount,
         timestamp: Date.now(),
       });
     } catch (error) {
@@ -464,6 +542,50 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
     } catch (error) {
       logger.error('loadHiddenSessions error:', error);
       set({ hiddenSessionIds: [] });
+    }
+  },
+
+  // Set (merge) a session's annotation (optimistic update)
+  setSessionAnnotation: async (session, patch) => {
+    const key = buildAnnotationKey(session.contextId, session.projectId, session.id);
+    const previousAnnotations = get().sessionAnnotations;
+    const existing = previousAnnotations[key] ?? { tags: [], score: null, note: '' };
+
+    const next: SessionAnnotation = {
+      tags: patch.tags ?? existing.tags,
+      score: patch.score !== undefined ? patch.score : existing.score,
+      note: patch.note ?? existing.note,
+      updatedAt: Date.now(),
+    };
+
+    const isEmpty = next.tags.length === 0 && next.score === null && next.note.trim().length === 0;
+
+    // Optimistic: update UI immediately (mirror the main-process empty-deletion rule)
+    const optimistic = { ...previousAnnotations };
+    if (isEmpty) {
+      delete optimistic[key];
+    } else {
+      optimistic[key] = next;
+    }
+    set({ sessionAnnotations: optimistic });
+
+    try {
+      await api.config.setSessionAnnotation(key, patch);
+    } catch (error) {
+      // Rollback on failure
+      set({ sessionAnnotations: previousAnnotations });
+      logger.error('setSessionAnnotation error:', error);
+    }
+  },
+
+  // Load session annotations from config into the local map
+  loadSessionAnnotations: async () => {
+    try {
+      const config = await api.config.get();
+      set({ sessionAnnotations: config.sessions?.sessionAnnotations ?? {} });
+    } catch (error) {
+      logger.error('loadSessionAnnotations error:', error);
+      set({ sessionAnnotations: {} });
     }
   },
 

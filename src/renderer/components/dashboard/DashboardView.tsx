@@ -10,14 +10,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { api } from '@renderer/api';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
+import { projectMatchesSource } from '@renderer/utils/sourceFilter';
 import { formatShortcut } from '@renderer/utils/stringUtils';
 import { createLogger } from '@shared/utils/logger';
 import { useShallow } from 'zustand/react/shallow';
 
 const logger = createLogger('Component:DashboardView');
 import { formatDistanceToNow } from 'date-fns';
-import { Command, FolderGit2, FolderOpen, GitBranch, Search, Settings } from 'lucide-react';
+import { BarChart3, Command, FolderGit2, FolderOpen, GitBranch, Search, Settings } from 'lucide-react';
 
 import type { RepositoryGroup } from '@renderer/types/data';
 
@@ -31,6 +33,7 @@ interface CommandSearchProps {
 }
 
 const CommandSearch = ({ value, onChange }: Readonly<CommandSearchProps>): React.JSX.Element => {
+  const t = useT();
   const [isFocused, setIsFocused] = useState(false);
   const { openCommandPalette, selectedProjectId } = useStore(
     useShallow((s) => ({
@@ -67,7 +70,7 @@ const CommandSearch = ({ value, onChange }: Readonly<CommandSearchProps>): React
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Search projects..."
+          placeholder={t('dashboard.searchProjectsPlaceholder')}
           className="flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -76,7 +79,11 @@ const CommandSearch = ({ value, onChange }: Readonly<CommandSearchProps>): React
         <button
           onClick={() => openCommandPalette()}
           className="flex shrink-0 items-center gap-1 transition-opacity hover:opacity-80"
-          title={selectedProjectId ? `Search in sessions (${formatShortcut('K')})` : `Search projects (${formatShortcut('K')})`}
+          title={
+            selectedProjectId
+              ? t('dashboard.searchInSessionsTitle', { shortcut: formatShortcut('K') })
+              : t('dashboard.searchProjectsTitle', { shortcut: formatShortcut('K') })
+          }
         >
           <kbd className="flex h-5 items-center justify-center rounded border border-border bg-surface-overlay px-1.5 text-[10px] font-medium text-text-muted">
             <Command className="size-2.5" />
@@ -142,9 +149,10 @@ const RepositoryCard = ({
   onClick,
   isHighlighted,
 }: Readonly<RepositoryCardProps>): React.JSX.Element => {
+  const t = useT();
   const lastActivity = repo.mostRecentSession
     ? formatDistanceToNow(new Date(repo.mostRecentSession), { addSuffix: true })
-    : 'No recent activity';
+    : t('dashboard.noRecentActivity');
 
   const worktreeCount = repo.worktrees.length;
   const hasMultipleWorktrees = worktreeCount > 1;
@@ -180,10 +188,12 @@ const RepositoryCard = ({
         {hasMultipleWorktrees && (
           <span className="inline-flex items-center gap-1 text-[10px] text-text-secondary">
             <GitBranch className="size-3" />
-            {worktreeCount} worktrees
+            {t('dashboard.worktreeCount', { count: worktreeCount })}
           </span>
         )}
-        <span className="text-[10px] text-text-secondary">{repo.totalSessions} sessions</span>
+        <span className="text-[10px] text-text-secondary">
+          {t('dashboard.sessionCount', { count: repo.totalSessions })}
+        </span>
         <span className="text-text-muted">·</span>
         <span className="text-[10px] text-text-muted">{lastActivity}</span>
       </div>
@@ -196,6 +206,7 @@ const RepositoryCard = ({
 // =============================================================================
 
 const NewProjectCard = (): React.JSX.Element => {
+  const t = useT();
   const { repositoryGroups, selectRepository } = useStore(
     useShallow((s) => ({
       repositoryGroups: s.repositoryGroups,
@@ -236,13 +247,13 @@ const NewProjectCard = (): React.JSX.Element => {
     <button
       className="hover:bg-surface/30 group relative flex min-h-[120px] flex-col items-center justify-center rounded-sm border border-dashed border-border bg-transparent p-4 transition-all duration-300 hover:border-border-emphasis"
       onClick={handleClick}
-      title="Select a project folder"
+      title={t('dashboard.selectProjectFolderTitle')}
     >
       <div className="mb-2 flex size-8 items-center justify-center rounded-sm border border-dashed border-border transition-colors duration-300 group-hover:border-border-emphasis">
         <FolderOpen className="size-4 text-text-muted transition-colors group-hover:text-text-secondary" />
       </div>
       <span className="text-xs text-text-muted transition-colors group-hover:text-text-secondary">
-        Select Folder
+        {t('dashboard.selectFolder')}
       </span>
     </button>
   );
@@ -261,15 +272,22 @@ const ProjectsGrid = ({
   searchQuery,
   maxProjects = 12,
 }: Readonly<ProjectsGridProps>): React.JSX.Element => {
-  const { repositoryGroups, repositoryGroupsLoading, fetchRepositoryGroups, selectRepository } =
-    useStore(
-      useShallow((s) => ({
-        repositoryGroups: s.repositoryGroups,
-        repositoryGroupsLoading: s.repositoryGroupsLoading,
-        fetchRepositoryGroups: s.fetchRepositoryGroups,
-        selectRepository: s.selectRepository,
-      }))
-    );
+  const t = useT();
+  const {
+    repositoryGroups,
+    repositoryGroupsLoading,
+    fetchRepositoryGroups,
+    selectRepository,
+    sourceFilter,
+  } = useStore(
+    useShallow((s) => ({
+      repositoryGroups: s.repositoryGroups,
+      repositoryGroupsLoading: s.repositoryGroupsLoading,
+      fetchRepositoryGroups: s.fetchRepositoryGroups,
+      selectRepository: s.selectRepository,
+      sourceFilter: s.sourceFilter,
+    }))
+  );
 
   useEffect(() => {
     if (repositoryGroups.length === 0) {
@@ -277,14 +295,15 @@ const ProjectsGrid = ({
     }
   }, [repositoryGroups.length, fetchRepositoryGroups]);
 
-  // Filter projects based on search query
+  // Filter projects by the active source chip, then the search query.
   const filteredRepos = useMemo(() => {
+    const bySource = repositoryGroups.filter((repo) => projectMatchesSource(repo, sourceFilter));
     if (!searchQuery.trim()) {
-      return repositoryGroups.slice(0, maxProjects);
+      return bySource.slice(0, maxProjects);
     }
 
     const query = searchQuery.toLowerCase().trim();
-    return repositoryGroups
+    return bySource
       .filter((repo) => {
         // Match by name
         if (repo.name.toLowerCase().includes(query)) return true;
@@ -294,7 +313,7 @@ const ProjectsGrid = ({
         return false;
       })
       .slice(0, maxProjects);
-  }, [repositoryGroups, searchQuery, maxProjects]);
+  }, [repositoryGroups, searchQuery, maxProjects, sourceFilter]);
 
   if (repositoryGroupsLoading) {
     // Organic widths per card — no repeating stamp
@@ -356,8 +375,8 @@ const ProjectsGrid = ({
         <div className="mb-4 flex size-12 items-center justify-center rounded-sm border border-border bg-surface-raised">
           <Search className="size-6 text-text-muted" />
         </div>
-        <p className="mb-1 text-sm text-text-secondary">No projects found</p>
-        <p className="text-xs text-text-muted">No matches for &quot;{searchQuery}&quot;</p>
+        <p className="mb-1 text-sm text-text-secondary">{t('dashboard.noProjectsFound')}</p>
+        <p className="text-xs text-text-muted">{t('dashboard.noMatchesFor', { query: searchQuery })}</p>
       </div>
     );
   }
@@ -368,7 +387,7 @@ const ProjectsGrid = ({
         <div className="mb-4 flex size-12 items-center justify-center rounded-sm border border-border bg-surface-raised">
           <FolderGit2 className="size-6 text-text-muted" />
         </div>
-        <p className="mb-1 text-sm text-text-secondary">No projects found</p>
+        <p className="mb-1 text-sm text-text-secondary">{t('dashboard.noProjectsFound')}</p>
         <p className="font-mono text-xs text-text-muted">~/.claude/projects/</p>
       </div>
     );
@@ -394,8 +413,14 @@ const ProjectsGrid = ({
 // =============================================================================
 
 export const DashboardView = (): React.JSX.Element => {
+  const t = useT();
   const [searchQuery, setSearchQuery] = useState('');
-  const openSettingsTab = useStore((s) => s.openSettingsTab);
+  const { openSettingsTab, openAnalytics } = useStore(
+    useShallow((s) => ({
+      openSettingsTab: s.openSettingsTab,
+      openAnalytics: s.openAnalytics,
+    }))
+  );
 
   return (
     <div className="relative flex-1 overflow-auto bg-surface">
@@ -415,7 +440,7 @@ export const DashboardView = (): React.JSX.Element => {
         {/* Section header */}
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            {searchQuery.trim() ? 'Search Results' : 'Recent Projects'}
+            {searchQuery.trim() ? t('dashboard.searchResults') : t('dashboard.recentProjects')}
           </h2>
           <div className="flex items-center gap-3">
             {searchQuery.trim() && (
@@ -423,16 +448,24 @@ export const DashboardView = (): React.JSX.Element => {
                 onClick={() => setSearchQuery('')}
                 className="text-xs text-text-muted transition-colors hover:text-text-secondary"
               >
-                Clear search
+                {t('dashboard.clearSearch')}
               </button>
             )}
             <button
+              onClick={() => openAnalytics()}
+              className="flex items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-text-secondary"
+              title={t('analytics.open')}
+            >
+              <BarChart3 className="size-3" />
+              {t('analytics.title')}
+            </button>
+            <button
               onClick={() => openSettingsTab('general')}
               className="flex items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-text-secondary"
-              title="Change Claude data folder"
+              title={t('dashboard.changeClaudeFolderTitle')}
             >
               <Settings className="size-3" />
-              Change default folder
+              {t('dashboard.changeDefaultFolder')}
             </button>
           </div>
         </div>

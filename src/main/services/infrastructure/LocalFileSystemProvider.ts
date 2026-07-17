@@ -26,6 +26,10 @@ export class LocalFileSystemProvider implements FileSystemProvider {
     }
   }
 
+  existsSync(filePath: string): boolean {
+    return fs.existsSync(filePath);
+  }
+
   async readFile(filePath: string, encoding: BufferEncoding = 'utf8'): Promise<string> {
     return fs.promises.readFile(filePath, encoding);
   }
@@ -62,6 +66,14 @@ export class LocalFileSystemProvider implements FileSystemProvider {
         };
       })
     );
+  }
+
+  readdirSync(dirPath: string): FsDirent[] {
+    return fs.readdirSync(dirPath, { withFileTypes: true }).map((entry) => ({
+      name: entry.name,
+      isFile: () => entry.isFile(),
+      isDirectory: () => entry.isDirectory(),
+    }));
   }
 
   createReadStream(filePath: string, opts?: ReadStreamOptions): fs.ReadStream {

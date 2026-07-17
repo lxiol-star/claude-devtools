@@ -13,9 +13,11 @@
  * - SshConnectionManager: SSH connection lifecycle
  * - ServiceContext: Service bundle for a single workspace context
  * - ServiceContextRegistry: Registry coordinator for all contexts
+ * - AggregateQueries: Cross-context (multi-backend) query + merge helpers
  * - HttpServer: Fastify-based HTTP server for API and static file serving
  */
 
+export * from './AggregateQueries';
 export * from './ConfigManager';
 export * from './DataCache';
 export type * from './FileSystemProvider';

@@ -7,14 +7,19 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { SOURCE_COLORS } from '@renderer/constants/sourceColors';
+import { useLanguage, useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
+import { buildAnnotationKey } from '@shared/utils/annotationKey';
 import { formatTokensCompact } from '@shared/utils/tokenFormatting';
-import { formatDistanceToNowStrict } from 'date-fns';
+import { formatDistanceToNowStrict, type Locale } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import { EyeOff, MessageSquare, Pin } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { OngoingIndicator } from '../common/OngoingIndicator';
 
+import { AnnotationStars } from './AnnotationStars';
 import { SessionContextMenu } from './SessionContextMenu';
 
 import type { PhaseTokenBreakdown, Session } from '@renderer/types/data';
@@ -30,9 +35,13 @@ interface SessionItemProps {
 }
 
 /**
- * Format time distance in short form (e.g., "4m", "2h", "1d")
+ * Format time distance in short form (e.g., "4m", "2h", "1d").
+ * When a date-fns locale is provided, uses its natural relative form (e.g., "4 分钟前").
  */
-function formatShortTime(date: Date): string {
+function formatShortTime(date: Date, locale?: Locale): string {
+  if (locale) {
+    return formatDistanceToNowStrict(date, { addSuffix: true, locale });
+  }
   const distance = formatDistanceToNowStrict(date, { addSuffix: false });
   return distance
     .replace(' seconds', 's')
@@ -61,6 +70,7 @@ const ConsumptionBadge = ({
   contextConsumption: number;
   phaseBreakdown?: PhaseTokenBreakdown[];
 }>): React.JSX.Element => {
+  const t = useT();
   const [popoverPosition, setPopoverPosition] = useState<{
     top: number;
     left: number;
@@ -104,20 +114,22 @@ const ConsumptionBadge = ({
             }}
           >
             <div className="mb-1 font-medium" style={{ color: 'var(--color-text)' }}>
-              Total Context: {formatTokensCompact(contextConsumption)} tokens
+              {t('sidebar.totalContextTokens', { count: formatTokensCompact(contextConsumption) })}
             </div>
             {phaseBreakdown.length === 1 ? (
-              <div>Context: {formatTokensCompact(phaseBreakdown[0].peakTokens)}</div>
+              <div>
+                {t('sidebar.contextTokens', { count: formatTokensCompact(phaseBreakdown[0].peakTokens) })}
+              </div>
             ) : (
               phaseBreakdown.map((phase) => (
                 <div key={phase.phaseNumber} className="flex items-center gap-1">
                   <span style={{ color: 'var(--color-text-muted)' }}>
-                    Phase {phase.phaseNumber}:
+                    {t('sidebar.phase', { number: phase.phaseNumber })}
                   </span>
                   <span className="tabular-nums">{formatTokensCompact(phase.contribution)}</span>
                   {phase.postCompaction != null && (
                     <span style={{ color: 'var(--color-text-muted)' }}>
-                      (compacted to {formatTokensCompact(phase.postCompaction)})
+                      {t('sidebar.compactedTo', { count: formatTokensCompact(phase.postCompaction) })}
                     </span>
                   )}
                 </div>
@@ -139,6 +151,8 @@ export const SessionItem = React.memo(function SessionItem({
   isSelected,
   onToggleSelect,
 }: Readonly<SessionItemProps>): React.JSX.Element {
+  const t = useT();
+  const { language } = useLanguage();
   const {
     openTab,
     activeProjectId,
@@ -147,6 +161,8 @@ export const SessionItem = React.memo(function SessionItem({
     splitPane,
     togglePinSession,
     toggleHideSession,
+    setSessionAnnotation,
+    sourceFilter,
   } = useStore(
     useShallow((s) => ({
       openTab: s.openTab,
@@ -156,10 +172,18 @@ export const SessionItem = React.memo(function SessionItem({
       splitPane: s.splitPane,
       togglePinSession: s.togglePinSession,
       toggleHideSession: s.toggleHideSession,
+      setSessionAnnotation: s.setSessionAnnotation,
+      sourceFilter: s.sourceFilter,
     }))
   );
 
+  const annotation = useStore(
+    (s) => s.sessionAnnotations[buildAnnotationKey(session.contextId, session.projectId, session.id)]
+  );
+
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const sessionLabel = session.firstMessage?.slice(0, 50) ?? t('sidebar.session');
 
   const handleClick = (event: React.MouseEvent): void => {
     if (!activeProjectId) return;
@@ -177,13 +201,14 @@ export const SessionItem = React.memo(function SessionItem({
       {
         type: 'session',
         sessionId: session.id,
+        contextId: session.contextId,
         projectId: activeProjectId,
-        label: session.firstMessage?.slice(0, 50) ?? 'Session',
+        label: sessionLabel,
       },
       forceNewTab ? { forceNewTab } : { replaceActiveTab: true }
     );
 
-    selectSession(session.id);
+    selectSession(session.id, session.contextId);
   };
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -191,21 +216,20 @@ export const SessionItem = React.memo(function SessionItem({
     setContextMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
-  const sessionLabel = session.firstMessage?.slice(0, 50) ?? 'Session';
-
   const handleOpenInCurrentPane = useCallback(() => {
     if (!activeProjectId) return;
     openTab(
       {
         type: 'session',
         sessionId: session.id,
+        contextId: session.contextId,
         projectId: activeProjectId,
         label: sessionLabel,
       },
       { replaceActiveTab: true }
     );
-    selectSession(session.id);
-  }, [activeProjectId, openTab, selectSession, session.id, sessionLabel]);
+    selectSession(session.id, session.contextId);
+  }, [activeProjectId, openTab, selectSession, session.id, session.contextId, sessionLabel]);
 
   const handleOpenInNewTab = useCallback(() => {
     if (!activeProjectId) return;
@@ -213,13 +237,14 @@ export const SessionItem = React.memo(function SessionItem({
       {
         type: 'session',
         sessionId: session.id,
+        contextId: session.contextId,
         projectId: activeProjectId,
         label: sessionLabel,
       },
       { forceNewTab: true }
     );
-    selectSession(session.id);
-  }, [activeProjectId, openTab, selectSession, session.id, sessionLabel]);
+    selectSession(session.id, session.contextId);
+  }, [activeProjectId, openTab, selectSession, session.id, session.contextId, sessionLabel]);
 
   const handleSplitRightAndOpen = useCallback(() => {
     if (!activeProjectId) return;
@@ -227,10 +252,11 @@ export const SessionItem = React.memo(function SessionItem({
     openTab({
       type: 'session',
       sessionId: session.id,
+      contextId: session.contextId,
       projectId: activeProjectId,
       label: sessionLabel,
     });
-    selectSession(session.id);
+    selectSession(session.id, session.contextId);
     // Then split it to the right
     const state = useStore.getState();
     const focusedPaneId = state.paneLayout.focusedPaneId;
@@ -238,7 +264,7 @@ export const SessionItem = React.memo(function SessionItem({
     if (activeTabId) {
       splitPane(focusedPaneId, activeTabId, 'right');
     }
-  }, [activeProjectId, openTab, selectSession, session.id, sessionLabel, splitPane]);
+  }, [activeProjectId, openTab, selectSession, session.id, session.contextId, sessionLabel, splitPane]);
 
   // Height must match SESSION_HEIGHT (48px) in DateGroupedSessions.tsx for virtual scroll
   return (
@@ -271,8 +297,13 @@ export const SessionItem = React.memo(function SessionItem({
             className="truncate text-[13px] font-medium leading-tight"
             style={{ color: isActive ? 'var(--color-text)' : 'var(--color-text-muted)' }}
           >
-            {session.firstMessage ?? 'Untitled'}
+            {session.firstMessage ?? t('sidebar.untitled')}
           </span>
+          {annotation?.score != null && annotation.score > 0 && (
+            <span className="ml-auto shrink-0">
+              <AnnotationStars score={annotation.score} />
+            </span>
+          )}
         </div>
 
         {/* Second line: message count + time + context consumption */}
@@ -287,7 +318,8 @@ export const SessionItem = React.memo(function SessionItem({
           <span style={{ opacity: 0.5 }}>·</span>
           <span className="tabular-nums">
             {formatShortTime(
-              new Date(Math.max(session.updatedAt ?? session.createdAt, session.createdAt))
+              new Date(Math.max(session.updatedAt ?? session.createdAt, session.createdAt)),
+              language === 'zh' ? zhCN : undefined
             )}
           </span>
           {session.contextConsumption != null && session.contextConsumption > 0 && (
@@ -299,6 +331,33 @@ export const SessionItem = React.memo(function SessionItem({
               />
             </>
           )}
+          {/* Source badge — only in the aggregate ("All") view for tagged sessions */}
+          {sourceFilter === 'all' && session.sourceBackend && (
+            <>
+              <span style={{ opacity: 0.5 }}>·</span>
+              <span className="flex items-center gap-0.5">
+                <span
+                  className="size-1.5 rounded-full"
+                  style={{ backgroundColor: SOURCE_COLORS[session.sourceBackend] }}
+                />
+                {t(`layout.sourceShort.${session.sourceBackend}`)}
+              </span>
+            </>
+          )}
+          {/* Annotation tag chips */}
+          {annotation?.tags.map((tag) => (
+            <span
+              key={tag}
+              className="shrink-0 truncate rounded px-1 py-px text-[9px] leading-tight"
+              style={{
+                backgroundColor: 'var(--color-surface-raised)',
+                color: 'var(--color-text-secondary)',
+                maxWidth: '80px',
+              }}
+            >
+              {tag}
+            </span>
+          ))}
         </div>
       </button>
 
@@ -314,12 +373,14 @@ export const SessionItem = React.memo(function SessionItem({
             paneCount={paneCount}
             isPinned={isPinned ?? false}
             isHidden={isHidden ?? false}
+            annotation={annotation}
             onClose={() => setContextMenu(null)}
             onOpenInCurrentPane={handleOpenInCurrentPane}
             onOpenInNewTab={handleOpenInNewTab}
             onSplitRightAndOpen={handleSplitRightAndOpen}
             onTogglePin={() => void togglePinSession(session.id)}
             onToggleHide={() => void toggleHideSession(session.id)}
+            onSetAnnotation={(patch) => void setSessionAnnotation(session, patch)}
           />,
           document.body
         )}

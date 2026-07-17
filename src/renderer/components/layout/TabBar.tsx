@@ -13,6 +13,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { isElectronMode } from '@renderer/api';
 import { HEADER_ROW1_HEIGHT } from '@renderer/constants/layout';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { formatShortcut } from '@renderer/utils/stringUtils';
 import { Bell, PanelLeft, Plus, RefreshCw } from 'lucide-react';
@@ -27,6 +28,7 @@ interface TabBarProps {
 }
 
 export const TabBar = ({ paneId }: TabBarProps): React.JSX.Element => {
+  const t = useT();
   const {
     pane,
     isFocused,
@@ -87,7 +89,7 @@ export const TabBar = ({ paneId }: TabBarProps): React.JSX.Element => {
   const selectedSet = useMemo(() => new Set(selectedTabIds), [selectedTabIds]);
 
   // Derive stable tab IDs array for SortableContext
-  const tabIds = useMemo(() => openTabs.map((t) => t.id), [openTabs]);
+  const tabIds = useMemo(() => openTabs.map((tab) => tab.id), [openTabs]);
 
   // Whether the active tab has session data loaded (for export menu visibility).
   // We no longer pass full sessionDetail here — export re-fetches on demand to save memory.
@@ -170,12 +172,12 @@ export const TabBar = ({ paneId }: TabBarProps): React.JSX.Element => {
 
       if (isShift && lastClickedTabIdRef.current) {
         // Shift+click: range selection from last clicked to current
-        const lastIndex = openTabs.findIndex((t) => t.id === lastClickedTabIdRef.current);
-        const currentIndex = openTabs.findIndex((t) => t.id === tabId);
+        const lastIndex = openTabs.findIndex((tab) => tab.id === lastClickedTabIdRef.current);
+        const currentIndex = openTabs.findIndex((tab) => tab.id === tabId);
         if (lastIndex !== -1 && currentIndex !== -1) {
           const start = Math.min(lastIndex, currentIndex);
           const end = Math.max(lastIndex, currentIndex);
-          const rangeIds = openTabs.slice(start, end + 1).map((t) => t.id);
+          const rangeIds = openTabs.slice(start, end + 1).map((tab) => tab.id);
           // Merge with existing selection
           const merged = new Set([...selectedTabIds, ...rangeIds]);
           setSelectedTabIds([...merged]);
@@ -239,7 +241,7 @@ export const TabBar = ({ paneId }: TabBarProps): React.JSX.Element => {
     contextMenuTabId && selectedSet.has(contextMenuTabId) ? selectedTabIds.length : 0;
 
   // Pin state for context menu tab
-  const contextMenuTab = contextMenuTabId ? openTabs.find((t) => t.id === contextMenuTabId) : null;
+  const contextMenuTab = contextMenuTabId ? openTabs.find((tab) => tab.id === contextMenuTabId) : null;
   const isContextMenuTabSession = contextMenuTab?.type === 'session';
   const isContextMenuTabPinned =
     isContextMenuTabSession && contextMenuTab?.sessionId
@@ -288,7 +290,7 @@ export const TabBar = ({ paneId }: TabBarProps): React.JSX.Element => {
               backgroundColor: expandHover ? 'var(--color-surface-raised)' : 'transparent',
             } as React.CSSProperties
           }
-          title="Expand sidebar"
+          title={t('layout.expandSidebar')}
         >
           <PanelLeft className="size-4" />
         </button>
@@ -342,7 +344,7 @@ export const TabBar = ({ paneId }: TabBarProps): React.JSX.Element => {
             onMouseEnter={() => setRefreshHover(true)}
             onMouseLeave={() => setRefreshHover(false)}
             onClick={handleRefresh}
-            title={`Refresh Session (${formatShortcut('R')})`}
+            title={t('layout.refreshSession', { shortcut: formatShortcut('R') })}
           >
             <RefreshCw className="size-4" />
           </button>
@@ -376,7 +378,7 @@ export const TabBar = ({ paneId }: TabBarProps): React.JSX.Element => {
             color: newTabHover ? 'var(--color-text)' : 'var(--color-text-muted)',
             backgroundColor: newTabHover ? 'var(--color-surface-raised)' : 'transparent',
           }}
-          title="New tab (Dashboard)"
+          title={t('layout.newTabDashboard')}
         >
           <Plus className="size-4" />
         </button>
@@ -391,7 +393,7 @@ export const TabBar = ({ paneId }: TabBarProps): React.JSX.Element => {
             color: notificationsHover ? 'var(--color-text)' : 'var(--color-text-muted)',
             backgroundColor: notificationsHover ? 'var(--color-surface-raised)' : 'transparent',
           }}
-          title="Notifications"
+          title={t('layout.notifications')}
         >
           <Bell className="size-4" />
           {unreadCount > 0 && (

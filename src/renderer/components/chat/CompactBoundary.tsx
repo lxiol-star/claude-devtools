@@ -10,6 +10,7 @@ import {
   TOOL_CALL_BORDER,
   TOOL_CALL_TEXT,
 } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { formatTokensCompact as formatTokens } from '@shared/utils/tokenFormatting';
 import { format } from 'date-fns';
 import { ChevronRight, Layers } from 'lucide-react';
@@ -40,6 +41,7 @@ export const CompactBoundary = ({
 }: Readonly<CompactBoundaryProps>): React.JSX.Element => {
   const { timestamp, message } = compactGroup;
   const [isExpanded, setIsExpanded] = useState(false);
+  const t = useT();
 
   // Extract content from message
   const getCompactContent = (): string => {
@@ -73,7 +75,7 @@ export const CompactBoundary = ({
           border: `1px solid ${TOOL_CALL_BORDER}`,
         }}
         aria-expanded={isExpanded}
-        aria-label="Toggle compacted content"
+        aria-label={t('chat.compact.toggle')}
       >
         {/* Icon Stack */}
         <div
@@ -92,7 +94,7 @@ export const CompactBoundary = ({
           className="shrink-0 whitespace-nowrap text-sm font-medium transition-colors"
           style={{ color: TOOL_CALL_TEXT }}
         >
-          Compacted
+          {t('chat.compact.label')}
         </span>
 
         {/* Token delta info */}
@@ -105,7 +107,9 @@ export const CompactBoundary = ({
             {formatTokens(compactGroup.tokenDelta.postCompactionTokens)}
             <span style={{ color: '#4ade80' }}>
               {' '}
-              ({formatTokens(Math.abs(compactGroup.tokenDelta.delta))} freed)
+              {t('chat.compact.freed', {
+                tokens: formatTokens(Math.abs(compactGroup.tokenDelta.delta)),
+              })}
             </span>
           </span>
         )}
@@ -116,7 +120,7 @@ export const CompactBoundary = ({
             className="shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px]"
             style={{ backgroundColor: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}
           >
-            Phase {compactGroup.startingPhaseNumber}
+            {t('chat.phase', { number: compactGroup.startingPhaseNumber })}
           </span>
         )}
 
@@ -154,12 +158,9 @@ export const CompactBoundary = ({
                 <Layers size={14} className="mt-0.5 shrink-0" style={{ color: COLOR_TEXT_MUTED }} />
                 <div className="text-xs leading-relaxed" style={{ color: COLOR_TEXT_MUTED }}>
                   <p className="mb-1 font-medium" style={{ color: COLOR_TEXT_SECONDARY }}>
-                    Conversation Compacted
+                    {t('chat.compact.emptyTitle')}
                   </p>
-                  <p>
-                    Previous messages were summarized to save context. The full conversation history
-                    is preserved in the session file.
-                  </p>
+                  <p>{t('chat.compact.emptyDesc')}</p>
                 </div>
               </div>
             )}

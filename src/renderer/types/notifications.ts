@@ -9,6 +9,7 @@ export {
   type AppConfig,
   type DetectedError,
   type NotificationTrigger,
+  type SavedView,
   type TriggerContentType,
   type TriggerMatchField,
   type TriggerMode,

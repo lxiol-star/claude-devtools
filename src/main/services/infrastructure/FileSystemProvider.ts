@@ -64,6 +64,13 @@ export interface FileSystemProvider {
   /** Check if a file or directory exists */
   exists(filePath: string): Promise<boolean>;
 
+  /**
+   * Synchronously check if a file or directory exists.
+   * Optional: only local providers are expected to implement this. Callers
+   * that need synchronous detection should fall back to `exists` when absent.
+   */
+  existsSync?(filePath: string): boolean;
+
   /** Read a file's contents as a string */
   readFile(filePath: string, encoding?: BufferEncoding): Promise<string>;
 
@@ -72,6 +79,13 @@ export interface FileSystemProvider {
 
   /** Read directory entries */
   readdir(dirPath: string): Promise<FsDirent[]>;
+
+  /**
+   * Synchronously read directory entries.
+   * Optional: only local providers are expected to implement this. Callers
+   * that need synchronous detection should fall back to `readdir` when absent.
+   */
+  readdirSync?(dirPath: string): FsDirent[];
 
   /** Create a readable stream for a file */
   createReadStream(filePath: string, opts?: ReadStreamOptions): Readable;

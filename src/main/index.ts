@@ -19,11 +19,15 @@ import {
 import { createLogger } from '@shared/utils/logger';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { existsSync } from 'fs';
-import { totalmem } from 'os';
+import { homedir, totalmem } from 'os';
 import { join } from 'path';
 
 import { initializeIpcHandlers, removeIpcHandlers } from './ipc/handlers';
-import { getProjectsBasePath, getTodosBasePath } from './utils/pathDecoder';
+import { shouldForwardContextFileChange } from './utils/contextEventForwarding';
+import { getClaudeBasePath, getProjectsBasePath, getTodosBasePath } from './utils/pathDecoder';
+import { detectBackend } from './backends';
+
+import type { DataBackendName } from '@shared/types/api';
 
 // Dynamic renderer heap limit — proportional to system RAM so low-end devices
 // are not starved.  50% of total RAM, clamped to [2 GB, 4 GB].
@@ -54,6 +58,7 @@ const logger = createLogger('App');
 // IPC channel constants (duplicated from @preload to avoid boundary violation)
 const SSH_STATUS = 'ssh:status';
 const CONTEXT_CHANGED = 'context:changed';
+const CONTEXT_FILE_CHANGE = 'context-file-change';
 const HTTP_SERVER_START = 'httpServer:start';
 const HTTP_SERVER_STOP = 'httpServer:stop';
 const HTTP_SERVER_GET_STATUS = 'httpServer:getStatus';
@@ -94,6 +99,11 @@ let httpServer: HttpServer;
 // File watcher event cleanup functions
 let fileChangeCleanup: (() => void) | null = null;
 let todoChangeCleanup: (() => void) | null = null;
+let memoryChangeCleanup: (() => void) | null = null;
+
+// Context-tagged file-change listener cleanups, keyed by context ID.
+// One entry per local-type context (primary 'local' + secondary 'local-{backend}').
+const contextFileChangeCleanups = new Map<string, () => void>();
 
 /**
  * Resolve production renderer index path.
@@ -122,6 +132,10 @@ function wireFileWatcherEvents(context: ServiceContext): void {
   if (todoChangeCleanup) {
     todoChangeCleanup();
     todoChangeCleanup = null;
+  }
+  if (memoryChangeCleanup) {
+    memoryChangeCleanup();
+    memoryChangeCleanup = null;
   }
 
   // Wire file-change events to renderer and HTTP SSE
@@ -152,8 +166,41 @@ function wireFileWatcherEvents(context: ServiceContext): void {
     httpServer?.broadcast('memory:changed', event);
   };
   context.fileWatcher.on('memory-change', memoryChangeHandler);
+  memoryChangeCleanup = () => context.fileWatcher.off('memory-change', memoryChangeHandler);
 
   logger.info(`FileWatcher events wired for context: ${context.id}`);
+}
+
+/**
+ * Wires context-tagged file-change events for a local-type context so the
+ * aggregate "All" view can live-update from every backend, not just the
+ * active one. Events are sent as `{ contextId, event }` on the
+ * 'context-file-change' channel (renderer + HTTP SSE).
+ *
+ * Events are skipped while the context is active — the active context's
+ * events already flow through the untagged 'file-change' wiring installed
+ * by wireFileWatcherEvents (avoids duplicate refreshes).
+ */
+function wireContextFileChangeEvents(context: ServiceContext): void {
+  // Rewire: drop any listener attached to a previous instance of this context.
+  contextFileChangeCleanups.get(context.id)?.();
+
+  const handler = (event: unknown): void => {
+    if (!shouldForwardContextFileChange(contextRegistry.getActiveContextId(), context.id)) {
+      return;
+    }
+    const payload = { contextId: context.id, event };
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(CONTEXT_FILE_CHANGE, payload);
+    }
+    httpServer?.broadcast(CONTEXT_FILE_CHANGE, payload);
+  };
+  context.fileWatcher.on('file-change', handler);
+  contextFileChangeCleanups.set(context.id, () =>
+    context.fileWatcher.off('file-change', handler)
+  );
+
+  logger.info(`Context-tagged file-change events wired for context: ${context.id}`);
 }
 
 /**
@@ -192,12 +239,118 @@ function onContextSwitched(context: ServiceContext): void {
   }
 }
 
+interface KnownDataRootEntry {
+  backend: DataBackendName;
+  dirName: string;
+}
+
+/**
+ * Known local data roots for Claude Code, Kimi Code, and Codex CLI.
+ */
+const KNOWN_DATA_ROOTS: KnownDataRootEntry[] = [
+  { backend: 'claude', dirName: '.claude' },
+  { backend: 'kimi', dirName: '.kimi-code' },
+  { backend: 'codex', dirName: '.codex' },
+];
+
+/**
+ * Resolve projects/sessions directory and backend identifier for a data root.
+ */
+function getContextDirsForRoot(
+  rootPath: string
+): { projectsDir: string; todosDir: string; backend: DataBackendName } {
+  const fsProvider = new LocalFileSystemProvider();
+  const backend = detectBackend(rootPath, fsProvider) ?? 'claude';
+  const sessionsDirName = backend === 'kimi' || backend === 'codex' ? 'sessions' : 'projects';
+  return {
+    projectsDir: join(rootPath, sessionsDirName),
+    todosDir: join(rootPath, 'todos'),
+    backend,
+  };
+}
+
+/**
+ * Create a secondary local context for the given data root.
+ */
+function createSecondaryLocalContext(
+  rootPath: string,
+  backend: DataBackendName,
+  contextId: string
+): ServiceContext {
+  const { projectsDir, todosDir } = getContextDirsForRoot(rootPath);
+  return new ServiceContext({
+    id: contextId,
+    type: 'local',
+    fsProvider: new LocalFileSystemProvider(),
+    projectsDir,
+    todosDir,
+    backend,
+  });
+}
+
+/**
+ * Rebuild the set of secondary local contexts (local-claude/kimi/codex) based on the
+ * current primary root. Call after primary root changes.
+ */
+function rebuildSecondaryLocalContexts(primaryRootPath: string): void {
+  if (!contextRegistry) {
+    return;
+  }
+
+  // Dispose existing secondary contexts. If one is currently active, switch to 'local' first.
+  const secondaryIds = contextRegistry
+    .list()
+    .map((ctx) => ctx.id)
+    .filter((id) => id.startsWith('local-'));
+  for (const id of secondaryIds) {
+    try {
+      // Drop the context-tagged listener before disposing the context.
+      contextFileChangeCleanups.get(id)?.();
+      contextFileChangeCleanups.delete(id);
+      if (contextRegistry.getActiveContextId() === id) {
+        contextRegistry.switch('local');
+      }
+      contextRegistry.destroy(id);
+    } catch (error) {
+      logger.error(`Failed to destroy secondary context "${id}":`, error);
+    }
+  }
+
+  // Register a context for each known root that exists and is not the primary root.
+  const home = homedir();
+  for (const { backend, dirName } of KNOWN_DATA_ROOTS) {
+    const rootPath = join(home, dirName);
+    if (!existsSync(rootPath) || rootPath === primaryRootPath) {
+      continue;
+    }
+    try {
+      const context = createSecondaryLocalContext(rootPath, backend, `local-${backend}`);
+      contextRegistry.registerContext(context);
+      if (notificationManager) {
+        context.fileWatcher.setNotificationManager(notificationManager);
+      }
+      context.start();
+      // Keep watching even while inactive — tagged events feed the aggregate view.
+      wireContextFileChangeEvents(context);
+      logger.info(`Registered secondary local context: ${context.id} (${rootPath})`);
+    } catch (error) {
+      logger.error(`Failed to register secondary context for ${rootPath}:`, error);
+    }
+  }
+}
+
 /**
  * Rebuilds the local ServiceContext using the current configured Claude root paths.
  * Called when general.claudeRootPath changes.
  */
 function reconfigureLocalContextForClaudeRoot(): void {
   try {
+    // When DATA_ROOT is set explicitly, we never fall back to the configured Claude root.
+    if (process.env.DATA_ROOT) {
+      logger.info('Skipping Claude root reconfiguration because DATA_ROOT is set');
+      return;
+    }
+
     const currentLocal = contextRegistry.get('local');
     if (!currentLocal) {
       logger.error('Cannot reconfigure local context: local context not found');
@@ -205,6 +358,7 @@ function reconfigureLocalContextForClaudeRoot(): void {
     }
 
     const wasLocalActive = contextRegistry.getActiveContextId() === 'local';
+    const primaryRootPath = getClaudeBasePath();
     const projectsDir = getProjectsBasePath();
     const todosDir = getTodosBasePath();
 
@@ -220,6 +374,7 @@ function reconfigureLocalContextForClaudeRoot(): void {
       fsProvider: new LocalFileSystemProvider(),
       projectsDir,
       todosDir,
+      backend: detectBackend(primaryRootPath, new LocalFileSystemProvider()) ?? 'claude',
     });
 
     if (notificationManager) {
@@ -227,15 +382,18 @@ function reconfigureLocalContextForClaudeRoot(): void {
     }
     replacementLocal.start();
 
-    if (!wasLocalActive) {
-      replacementLocal.stopFileWatcher();
-    }
-
     contextRegistry.replaceContext('local', replacementLocal);
 
     if (wasLocalActive) {
       wireFileWatcherEvents(replacementLocal);
     }
+    // The primary 'local' context keeps watching even while inactive
+    // (same as secondary local contexts) so the aggregate "All" view
+    // receives live updates from it too.
+    wireContextFileChangeEvents(replacementLocal);
+
+    // Rebuild secondary contexts to match the new primary root.
+    rebuildSecondaryLocalContexts(primaryRootPath);
   } catch (error) {
     logger.error('Failed to reconfigure local context for Claude root change:', error);
   }
@@ -253,8 +411,34 @@ function initializeServices(): void {
   // Create ServiceContextRegistry
   contextRegistry = new ServiceContextRegistry();
 
-  const localProjectsDir = getProjectsBasePath();
-  const localTodosDir = getTodosBasePath();
+  const dataRoot = process.env.DATA_ROOT;
+  let primaryRootPath: string;
+  let localProjectsDir: string;
+  let localTodosDir: string;
+
+  if (dataRoot) {
+    primaryRootPath = dataRoot;
+    const backendName = detectBackend(dataRoot, new LocalFileSystemProvider());
+    switch (backendName) {
+      case 'kimi':
+      case 'codex':
+        localProjectsDir = join(dataRoot, 'sessions');
+        localTodosDir = join(dataRoot, 'todos');
+        break;
+      case 'claude':
+      default:
+        localProjectsDir = join(dataRoot, 'projects');
+        localTodosDir = join(dataRoot, 'todos');
+    }
+    logger.info(`Using DATA_ROOT: ${dataRoot} (backend: ${backendName ?? 'unknown'})`);
+  } else {
+    primaryRootPath = getClaudeBasePath();
+    localProjectsDir = getProjectsBasePath();
+    localTodosDir = getTodosBasePath();
+  }
+
+  // Initialize notification manager (singleton, not context-scoped) before contexts start
+  notificationManager = NotificationManager.getInstance();
 
   // Create local context
   const localContext = new ServiceContext({
@@ -263,6 +447,7 @@ function initializeServices(): void {
     fsProvider: new LocalFileSystemProvider(),
     projectsDir: localProjectsDir,
     todosDir: localTodosDir,
+    backend: detectBackend(primaryRootPath, new LocalFileSystemProvider()) ?? 'claude',
   });
 
   // Register and start local context
@@ -271,14 +456,17 @@ function initializeServices(): void {
 
   logger.info(`Projects directory: ${localContext.projectScanner.getProjectsDir()}`);
 
-  // Initialize notification manager (singleton, not context-scoped)
-  notificationManager = NotificationManager.getInstance();
-
   // Set notification manager on local context's file watcher
   localContext.fileWatcher.setNotificationManager(notificationManager);
 
   // Wire file watcher events for local context
   wireFileWatcherEvents(localContext);
+  // Also forward context-tagged events for when 'local' is not the active
+  // context (aggregate "All" view live updates).
+  wireContextFileChangeEvents(localContext);
+
+  // Register secondary contexts for other detected data roots.
+  rebuildSecondaryLocalContexts(primaryRootPath);
 
   // Initialize updater service
   updaterService = new UpdaterService();
@@ -378,6 +566,7 @@ async function startHttpServer(
         memoryReader: activeContext.memoryReader,
         updaterService,
         sshConnectionManager,
+        contextRegistry,
       },
       modeSwitchHandler,
       config.httpServer?.port ?? 3456
@@ -408,6 +597,14 @@ function shutdownServices(): void {
     todoChangeCleanup();
     todoChangeCleanup = null;
   }
+  if (memoryChangeCleanup) {
+    memoryChangeCleanup();
+    memoryChangeCleanup = null;
+  }
+  for (const cleanup of contextFileChangeCleanups.values()) {
+    cleanup();
+  }
+  contextFileChangeCleanups.clear();
 
   // Dispose all contexts (including local)
   if (contextRegistry) {

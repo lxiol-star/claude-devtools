@@ -4,12 +4,14 @@ import { isNearBottom, useAutoScrollBottom } from '@renderer/hooks/useAutoScroll
 import { useTabNavigationController } from '@renderer/hooks/useTabNavigationController';
 import { useTabUI } from '@renderer/hooks/useTabUI';
 import { useVisibleAIGroup } from '@renderer/hooks/useVisibleAIGroup';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronsDown } from 'lucide-react';
+import { ChevronsDown, GanttChartSquare } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { SessionContextPanel } from './SessionContextPanel/index';
+import { SessionTimeline } from './SessionTimeline';
 
 /** Pixels from bottom considered "near bottom" for scroll-button visibility and auto-scroll. */
 const SCROLL_THRESHOLD = 300;
@@ -37,6 +39,7 @@ interface ChatHistoryProps {
 }
 
 export const ChatHistory = ({ tabId }: ChatHistoryProps): JSX.Element => {
+  const t = useT();
   const VIRTUALIZATION_THRESHOLD = 30;
   const ESTIMATED_CHAT_ITEM_HEIGHT = 260;
 
@@ -44,6 +47,8 @@ export const ChatHistory = ({ tabId }: ChatHistoryProps): JSX.Element => {
   const {
     isContextPanelVisible,
     setContextPanelVisible,
+    isTimelinePanelVisible,
+    setTimelinePanelVisible,
     savedScrollTop,
     saveScrollPosition,
     expandAIGroup,
@@ -102,6 +107,8 @@ export const ChatHistory = ({ tabId }: ChatHistoryProps): JSX.Element => {
 
   // State for Context button hover (local state OK - doesn't need per-tab isolation)
   const [isContextButtonHovered, setIsContextButtonHovered] = useState(false);
+  // State for Timeline button hover (local state OK - doesn't need per-tab isolation)
+  const [isTimelineButtonHovered, setIsTimelineButtonHovered] = useState(false);
 
   // Determine if this tab instance is currently active
   // Use tabId prop if provided, otherwise fall back to activeTabId (for backwards compatibility)
@@ -109,7 +116,7 @@ export const ChatHistory = ({ tabId }: ChatHistoryProps): JSX.Element => {
   const isThisTabActive = effectiveTabId === activeTabId;
 
   // Get THIS tab's pending navigation request
-  const thisTab = effectiveTabId ? openTabs.find((t) => t.id === effectiveTabId) : null;
+  const thisTab = effectiveTabId ? openTabs.find((tab) => tab.id === effectiveTabId) : null;
   const pendingNavigation = thisTab?.pendingNavigation;
 
   // Compute all accumulated context injections (phase-aware)
@@ -516,6 +523,46 @@ export const ChatHistory = ({ tabId }: ChatHistoryProps): JSX.Element => {
     [conversation, ensureGroupVisible, setHighlightedGroupId]
   );
 
+  // Navigate to the conversation location for a timeline (waterfall) item.
+  // Tool items carry an id of `tool-${toolCallId}`; we find the AI group whose
+  // displayItems contain that tool to recover its turnIndex, then reuse the
+  // tool-navigation path. Chunk (turn) items scroll to the matching AI group.
+  const handleNavigateToTimelineItem = useCallback(
+    (waterfallItemId: string, itemType: 'chunk' | 'subagent' | 'tool') => {
+      if (!conversation) return;
+
+      if (itemType === 'tool') {
+        const toolUseId = waterfallItemId.replace(/^tool-/, '');
+        // Match against the group's semantic steps (always present), NOT
+        // displayItems — displayItems only exist on the lazily-enhanced group
+        // and are undefined here, which previously made every lookup fail.
+        // A tool_call step's id is the tool call id.
+        for (const item of conversation.items) {
+          if (item.type !== 'ai') continue;
+          const hasTool = item.group.steps.some(
+            (step) => step.type === 'tool_call' && step.id === toolUseId
+          );
+          if (hasTool) {
+            handleNavigateToTool(item.group.turnIndex, toolUseId);
+            return;
+          }
+        }
+        return;
+      }
+
+      // chunk / subagent → navigate to the AI group whose id matches the chunk.
+      const groupId =
+        itemType === 'subagent' ? waterfallItemId.replace(/^subagent-/, '') : waterfallItemId;
+      const target = conversation.items.find(
+        (item) => item.type === 'ai' && item.group.id === groupId
+      );
+      if (target?.type === 'ai') {
+        handleNavigateToTurn(target.group.turnIndex);
+      }
+    },
+    [conversation, handleNavigateToTool, handleNavigateToTurn]
+  );
+
   // Scroll to current search result when it changes
   useEffect(() => {
     const currentMatch = currentSearchIndex >= 0 ? searchMatches[currentSearchIndex] : null;
@@ -757,9 +804,9 @@ export const ChatHistory = ({ tabId }: ChatHistoryProps): JSX.Element => {
           style={{ backgroundColor: 'var(--color-surface)' }}
           onScroll={checkScrollButton}
         >
-          {/* Sticky Context button */}
-          {allContextInjections.length > 0 && (
-            <div className="pointer-events-none sticky top-0 z-10 flex justify-end px-4 pb-0 pt-3">
+          {/* Sticky Context + Timeline buttons */}
+          <div className="pointer-events-none sticky top-0 z-10 flex justify-end gap-2 px-4 pb-0 pt-3">
+            {allContextInjections.length > 0 && (
               <button
                 onClick={() => setContextPanelVisible(!isContextPanelVisible)}
                 onMouseEnter={() => setIsContextButtonHovered(true)}
@@ -776,14 +823,30 @@ export const ChatHistory = ({ tabId }: ChatHistoryProps): JSX.Element => {
                     : 'var(--color-text-secondary)',
                 }}
               >
-                Context ({allContextInjections.length})
+                {t('chat.contextButton', { count: allContextInjections.length })}
               </button>
-            </div>
-          )}
-          <div
-            className="mx-auto max-w-5xl px-6 py-8"
-            style={{ marginTop: allContextInjections.length > 0 ? '-2rem' : 0 }}
-          >
+            )}
+            <button
+              onClick={() => setTimelinePanelVisible(!isTimelinePanelVisible)}
+              onMouseEnter={() => setIsTimelineButtonHovered(true)}
+              onMouseLeave={() => setIsTimelineButtonHovered(false)}
+              className="pointer-events-auto flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs shadow-lg transition-colors"
+              style={{
+                backgroundColor: isTimelinePanelVisible
+                  ? 'var(--context-btn-active-bg)'
+                  : isTimelineButtonHovered
+                    ? 'var(--context-btn-bg-hover)'
+                    : 'var(--context-btn-bg)',
+                color: isTimelinePanelVisible
+                  ? 'var(--context-btn-active-text)'
+                  : 'var(--color-text-secondary)',
+              }}
+            >
+              <GanttChartSquare className="size-3.5" />
+              <span>{t('chat.timelineButton')}</span>
+            </button>
+          </div>
+          <div className="mx-auto max-w-5xl px-6 py-8" style={{ marginTop: '-2rem' }}>
             <div className="space-y-8">
               {shouldVirtualize ? (
                 <div
@@ -862,10 +925,10 @@ export const ChatHistory = ({ tabId }: ChatHistoryProps): JSX.Element => {
               color: 'var(--color-text-secondary)',
               border: '1px solid var(--color-border-emphasis)',
             }}
-            title="Scroll to bottom"
+            title={t('chat.scrollToBottom')}
           >
             <ChevronsDown className="size-3.5" />
-            <span>Bottom</span>
+            <span>{t('chat.bottom')}</span>
           </button>
         )}
 
@@ -883,6 +946,22 @@ export const ChatHistory = ({ tabId }: ChatHistoryProps): JSX.Element => {
               phaseInfo={sessionPhaseInfo ?? undefined}
               selectedPhase={selectedContextPhase}
               onPhaseChange={setSelectedContextPhase}
+            />
+          </div>
+        )}
+
+        {/* Timeline panel sidebar */}
+        {isTimelinePanelVisible && sessionDetail?.session && (
+          <div className="w-96 shrink-0">
+            <SessionTimeline
+              projectId={sessionDetail.session.projectId}
+              sessionId={sessionDetail.session.id}
+              // Origin context in aggregate ("All") mode lives on the tab — the
+              // backend-built detail session is never tagged with it. Fall back
+              // to any tag the session does carry.
+              contextId={thisTab?.contextId ?? sessionDetail.session.contextId}
+              onClose={() => setTimelinePanelVisible(false)}
+              onNavigateToItem={handleNavigateToTimelineItem}
             />
           </div>
         )}

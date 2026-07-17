@@ -16,7 +16,11 @@ import {
 /**
  * Renders the input section based on tool type with theme-aware styling.
  */
-export function renderInput(toolName: string, input: Record<string, unknown>): React.ReactElement {
+export function renderInput(
+  toolName: string,
+  input: Record<string, unknown>,
+  t: (key: string) => string
+): React.ReactElement {
   // Special rendering for Edit tool - show diff-like format
   if (toolName === 'Edit') {
     const filePath = input.file_path as string | undefined;
@@ -31,7 +35,7 @@ export function renderInput(toolName: string, input: Record<string, unknown>): R
             {filePath}
             {replaceAll && (
               <span className="ml-2" style={{ color: COLOR_TEXT_MUTED }}>
-                (replace all)
+                {t('chat.tool.replaceAll')}
               </span>
             )}
           </div>

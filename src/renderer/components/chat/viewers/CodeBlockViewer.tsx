@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 
+import { useT } from '@renderer/i18n';
 import { getBaseName } from '@renderer/utils/pathUtils';
 import { createLogger } from '@shared/utils/logger';
 import { Check, Copy, FileCode } from 'lucide-react';
@@ -125,6 +126,7 @@ export const CodeBlockViewer: React.FC<CodeBlockViewerProps> = ({
   endLine,
   maxHeight = 'max-h-96',
 }): React.JSX.Element => {
+  const t = useT();
   const [isCopied, setIsCopied] = useState(false);
 
   // Infer language from file extension if not provided
@@ -178,7 +180,7 @@ export const CodeBlockViewer: React.FC<CodeBlockViewerProps> = ({
           </span>
           {(startLine > 1 || endLine) && (
             <span className="shrink-0 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              (lines {startLine}-{actualEndLine})
+              {t('chat.viewer.lines', { start: startLine, end: actualEndLine })}
             </span>
           )}
           <span
@@ -197,7 +199,7 @@ export const CodeBlockViewer: React.FC<CodeBlockViewerProps> = ({
         <button
           onClick={handleCopy}
           className="rounded p-1 transition-colors hover:opacity-80"
-          title="Copy to clipboard"
+          title={t('chat.viewer.copyToClipboard')}
           style={{ backgroundColor: 'transparent' }}
         >
           {isCopied ? (

@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { useT } from '@renderer/i18n';
 import { MessageSquare } from 'lucide-react';
 
 import { MarkdownViewer } from '../viewers';
@@ -32,6 +33,7 @@ export const TextItem: React.FC<TextItemProps> = React.memo(function TextItem({
   highlightStyle,
   notificationDotColor,
 }) {
+  const t = useT();
   const fullContent = step.content.outputText ?? preview;
   const truncatedPreview = truncateText(preview, 60);
 
@@ -41,7 +43,7 @@ export const TextItem: React.FC<TextItemProps> = React.memo(function TextItem({
   return (
     <BaseItem
       icon={<MessageSquare className="size-4" />}
-      label="Output"
+      label={t('chat.output')}
       summary={truncatedPreview}
       tokenCount={tokenCount}
       onClick={onClick}

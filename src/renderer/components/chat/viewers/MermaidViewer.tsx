@@ -10,6 +10,7 @@ import {
   PROSE_PRE_BORDER,
 } from '@renderer/constants/cssVariables';
 import { useTheme } from '@renderer/hooks/useTheme';
+import { useT } from '@renderer/i18n';
 import { Code, GitBranch } from 'lucide-react';
 
 import type mermaidApi from 'mermaid';
@@ -53,6 +54,7 @@ interface MermaidViewerProps {
 }
 
 export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code }) => {
+  const t = useT();
   const uniqueId = useId().replace(/:/g, '-');
   const [showCode, setShowCode] = useState(false);
   const [svg, setSvg] = useState<string>('');
@@ -83,7 +85,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code }) => {
       } catch (err) {
         if (!cancelled) {
           console.error('Failed to render mermaid diagram:', err);
-          setError(err instanceof Error ? err.message : 'Failed to render mermaid diagram');
+          setError(err instanceof Error ? err.message : t('chat.viewer.mermaidError'));
           setSvg('');
         }
       } finally {
@@ -95,7 +97,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code }) => {
       cancelled = true;
       cleanupOrphans();
     };
-  }, [code, isDark, uniqueId]);
+  }, [code, isDark, uniqueId, t]);
 
   return (
     <div
@@ -112,17 +114,17 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code }) => {
       >
         <GitBranch className="size-3.5 shrink-0" style={{ color: COLOR_TEXT_MUTED }} />
         <span className="text-xs font-medium" style={{ color: COLOR_TEXT_MUTED }}>
-          Mermaid Diagram
+          {t('chat.viewer.mermaidDiagram')}
         </span>
         <span className="flex-1" />
         <button
           onClick={() => setShowCode(!showCode)}
           className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors hover:bg-white/10"
           style={{ color: COLOR_TEXT_MUTED }}
-          title={showCode ? 'Show diagram' : 'Show code'}
+          title={showCode ? t('chat.viewer.showDiagram') : t('chat.viewer.showCode')}
         >
           <Code className="size-3" />
-          {showCode ? 'Diagram' : 'Code'}
+          {showCode ? t('chat.viewer.diagram') : t('chat.viewer.code')}
         </button>
         <CopyButton text={code} inline />
       </div>
@@ -165,7 +167,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code }) => {
       ) : (
         <div className="flex items-center justify-center p-4">
           <span className="text-xs" style={{ color: COLOR_TEXT_MUTED }}>
-            Rendering...
+            {t('chat.viewer.rendering')}
           </span>
         </div>
       )}

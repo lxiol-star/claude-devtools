@@ -4,6 +4,8 @@
 
 import React from 'react';
 
+import { useT } from '@renderer/i18n';
+
 import { MentionedFileItem } from '../items/MentionedFileItem';
 
 import { CollapsibleSection } from './CollapsibleSection';
@@ -27,11 +29,13 @@ export const MentionedFilesSection = ({
   projectRoot,
   onNavigateToTurn,
 }: Readonly<MentionedFilesSectionProps>): React.ReactElement | null => {
+  const t = useT();
+
   if (injections.length === 0) return null;
 
   return (
     <CollapsibleSection
-      title="Mentioned Files"
+      title={t('chat.context.mentionedFiles')}
       count={injections.length}
       tokenCount={tokenCount}
       isExpanded={isExpanded}

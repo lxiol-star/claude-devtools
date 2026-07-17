@@ -7,6 +7,7 @@
 import React from 'react';
 
 import { DiffViewer } from '@renderer/components/chat/viewers';
+import { useT } from '@renderer/i18n';
 
 import { type ItemStatus, StatusDot } from '../BaseItem';
 import { formatTokens } from '../baseItemHelpers';
@@ -21,6 +22,7 @@ interface EditToolViewerProps {
 }
 
 export const EditToolViewer: React.FC<EditToolViewerProps> = ({ linkedTool, status }) => {
+  const t = useT();
   const toolUseResult = linkedTool.result?.toolUseResult as Record<string, unknown> | undefined;
 
   const filePath = (toolUseResult?.filePath as string) || (linkedTool.input.file_path as string);
@@ -45,11 +47,11 @@ export const EditToolViewer: React.FC<EditToolViewerProps> = ({ linkedTool, stat
             className="mb-1 flex items-center gap-2 text-xs"
             style={{ color: 'var(--tool-item-muted)' }}
           >
-            Result
+            {t('chat.tool.result')}
             <StatusDot status={status} />
             {linkedTool.result?.tokenCount !== undefined && linkedTool.result.tokenCount > 0 && (
               <span style={{ color: 'var(--color-text-muted)' }}>
-                ~{formatTokens(linkedTool.result.tokenCount)} tokens
+                {t('chat.tokens', { count: formatTokens(linkedTool.result.tokenCount) })}
               </span>
             )}
           </div>

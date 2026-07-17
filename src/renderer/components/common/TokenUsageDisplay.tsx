@@ -11,6 +11,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { COLOR_TEXT_MUTED, COLOR_TEXT_SECONDARY } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { getModelColorClass } from '@shared/utils/modelParser';
 import {
   formatTokensCompact as formatTokens,
@@ -66,6 +67,7 @@ const SessionContextSection = ({
   thinkingTokens?: number;
   textOutputTokens?: number;
 }>): React.JSX.Element => {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   const { tokensByCategory } = contextStats;
@@ -130,7 +132,7 @@ const SessionContextSection = ({
           <ChevronRight
             className={`size-3 shrink-0 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
           />
-          <span className="whitespace-nowrap text-[10px]">Visible Context</span>
+          <span className="whitespace-nowrap text-[10px]">{t('layout.visibleContext')}</span>
         </div>
         <span
           className="whitespace-nowrap text-[10px] tabular-nums"
@@ -173,7 +175,7 @@ const SessionContextSection = ({
           {tokensByCategory.toolOutputs > 0 && (
             <div className="flex items-center justify-between text-[10px]">
               <span style={{ color: COLOR_TEXT_MUTED }}>
-                Tool Outputs <span className="opacity-60">×{toolOutputsCount}</span>
+                {t('layout.toolOutputs')} <span className="opacity-60">×{toolOutputsCount}</span>
               </span>
               <span className="tabular-nums" style={{ color: COLOR_TEXT_SECONDARY }}>
                 {formatTokens(tokensByCategory.toolOutputs)}{' '}
@@ -186,7 +188,8 @@ const SessionContextSection = ({
           {tokensByCategory.taskCoordination > 0 && (
             <div className="flex items-center justify-between text-[10px]">
               <span style={{ color: COLOR_TEXT_MUTED }}>
-                Task Coordination <span className="opacity-60">×{taskCoordinationCount}</span>
+                {t('layout.taskCoordination')}{' '}
+                <span className="opacity-60">×{taskCoordinationCount}</span>
               </span>
               <span className="tabular-nums" style={{ color: COLOR_TEXT_SECONDARY }}>
                 {formatTokens(tokensByCategory.taskCoordination)}{' '}
@@ -199,7 +202,7 @@ const SessionContextSection = ({
           {tokensByCategory.userMessages > 0 && (
             <div className="flex items-center justify-between text-[10px]">
               <span style={{ color: COLOR_TEXT_MUTED }}>
-                User Messages <span className="opacity-60">×{userMessagesCount}</span>
+                {t('layout.userMessages')} <span className="opacity-60">×{userMessagesCount}</span>
               </span>
               <span className="tabular-nums" style={{ color: COLOR_TEXT_SECONDARY }}>
                 {formatTokens(tokensByCategory.userMessages)}{' '}
@@ -211,7 +214,7 @@ const SessionContextSection = ({
           {/* Thinking + Text */}
           {thinkingTextTokens > 0 && (
             <div className="flex items-center justify-between text-[10px]">
-              <span style={{ color: COLOR_TEXT_MUTED }}>Thinking + Text</span>
+              <span style={{ color: COLOR_TEXT_MUTED }}>{t('layout.thinkingPlusText')}</span>
               <span className="tabular-nums" style={{ color: COLOR_TEXT_SECONDARY }}>
                 {formatTokens(thinkingTextTokens)}{' '}
                 <span className="opacity-60">({thinkingTextPercent}%)</span>
@@ -224,7 +227,7 @@ const SessionContextSection = ({
             className="pt-0.5 text-[9px] italic"
             style={{ color: COLOR_TEXT_MUTED, opacity: 0.7 }}
           >
-            Accumulated across entire session without duplication
+            {t('layout.accumulatedHint')}
           </div>
         </div>
       )}
@@ -247,6 +250,7 @@ export const TokenUsageDisplay = ({
   phaseNumber,
   totalPhases,
 }: Readonly<TokenUsageDisplayProps>): React.JSX.Element => {
+  const t = useT();
   const totalTokens = inputTokens + cacheReadTokens + cacheCreationTokens + outputTokens;
   const formattedTotal = formatTokens(totalTokens);
 
@@ -381,7 +385,7 @@ export const TokenUsageDisplay = ({
           className="rounded px-1 py-0.5 text-[10px]"
           style={{ backgroundColor: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}
         >
-          Phase {phaseNumber}/{totalPhases}
+          {t('layout.phaseCount', { phase: phaseNumber, total: totalPhases })}
         </span>
       )}
       <div
@@ -443,7 +447,7 @@ export const TokenUsageDisplay = ({
               <div className="space-y-2 text-xs">
                 {/* Input Tokens */}
                 <div className="flex items-center justify-between">
-                  <span style={{ color: COLOR_TEXT_MUTED }}>Input Tokens</span>
+                  <span style={{ color: COLOR_TEXT_MUTED }}>{t('layout.inputTokens')}</span>
                   <span
                     className="font-medium tabular-nums"
                     style={{ color: COLOR_TEXT_SECONDARY }}
@@ -454,7 +458,7 @@ export const TokenUsageDisplay = ({
 
                 {/* Cache Read */}
                 <div className="flex items-center justify-between">
-                  <span style={{ color: COLOR_TEXT_MUTED }}>Cache Read</span>
+                  <span style={{ color: COLOR_TEXT_MUTED }}>{t('layout.cacheRead')}</span>
                   <span
                     className="font-medium tabular-nums"
                     style={{ color: COLOR_TEXT_SECONDARY }}
@@ -465,7 +469,7 @@ export const TokenUsageDisplay = ({
 
                 {/* Cache Write/Creation */}
                 <div className="flex items-center justify-between">
-                  <span style={{ color: COLOR_TEXT_MUTED }}>Cache Write</span>
+                  <span style={{ color: COLOR_TEXT_MUTED }}>{t('layout.cacheWrite')}</span>
                   <span
                     className="font-medium tabular-nums"
                     style={{ color: COLOR_TEXT_SECONDARY }}
@@ -476,7 +480,7 @@ export const TokenUsageDisplay = ({
 
                 {/* Output Tokens */}
                 <div className="flex items-center justify-between">
-                  <span style={{ color: COLOR_TEXT_MUTED }}>Output Tokens</span>
+                  <span style={{ color: COLOR_TEXT_MUTED }}>{t('layout.outputTokens')}</span>
                   <span
                     className="font-medium tabular-nums"
                     style={{ color: COLOR_TEXT_SECONDARY }}
@@ -494,7 +498,7 @@ export const TokenUsageDisplay = ({
                 {/* Total */}
                 <div className="flex items-center justify-between">
                   <span className="font-medium" style={{ color: COLOR_TEXT_SECONDARY }}>
-                    Total
+                    {t('layout.total')}
                   </span>
                   <span
                     className="font-medium tabular-nums"
@@ -524,7 +528,7 @@ export const TokenUsageDisplay = ({
                     style={{ color: COLOR_TEXT_MUTED }}
                   >
                     <span className="whitespace-nowrap italic">
-                      incl. CLAUDE.md ×{claudeMdStats.accumulatedCount}
+                      {t('layout.inclClaudeMd', { count: claudeMdStats.accumulatedCount })}
                     </span>
                     <span className="tabular-nums">
                       {totalTokens > 0
@@ -543,7 +547,7 @@ export const TokenUsageDisplay = ({
                       style={{ borderTop: '1px solid var(--color-border-subtle)' }}
                     />
                     <div className="flex items-center justify-between">
-                      <span style={{ color: COLOR_TEXT_MUTED }}>Model</span>
+                      <span style={{ color: COLOR_TEXT_MUTED }}>{t('layout.model')}</span>
                       <span
                         className={`font-medium ${modelColorClass}`}
                         style={!modelColorClass ? { color: COLOR_TEXT_SECONDARY } : {}}

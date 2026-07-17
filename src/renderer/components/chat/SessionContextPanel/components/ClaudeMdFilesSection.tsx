@@ -4,6 +4,8 @@
 
 import React, { useMemo } from 'react';
 
+import { useT } from '@renderer/i18n';
+
 import { CLAUDE_MD_GROUP_CONFIG, CLAUDE_MD_GROUP_ORDER } from '../types';
 
 import { ClaudeMdSubSection } from './ClaudeMdSection';
@@ -29,6 +31,7 @@ export const ClaudeMdFilesSection = ({
   projectRoot,
   onNavigateToTurn,
 }: Readonly<ClaudeMdFilesSectionProps>): React.ReactElement | null => {
+  const t = useT();
   // Group CLAUDE.md injections by category
   const claudeMdGroups = useMemo(() => {
     const groups = new Map<ClaudeMdGroupCategory, ClaudeMdContextInjection[]>();
@@ -65,7 +68,7 @@ export const ClaudeMdFilesSection = ({
 
   return (
     <CollapsibleSection
-      title="CLAUDE.md Files"
+      title={t('chat.context.claudeMdFiles')}
       count={injections.length}
       tokenCount={tokenCount}
       isExpanded={isExpanded}
@@ -77,7 +80,7 @@ export const ClaudeMdFilesSection = ({
         return (
           <ClaudeMdSubSection
             key={category}
-            label={config.label}
+            label={t(config.labelKey)}
             injections={group}
             isDirectory={category === 'directory'}
             projectRoot={projectRoot}

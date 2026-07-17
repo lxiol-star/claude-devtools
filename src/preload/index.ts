@@ -4,11 +4,18 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   APP_RELAUNCH,
   CONTEXT_CHANGED,
+  CONTEXT_FILE_CHANGE,
   CONTEXT_GET_ACTIVE,
   CONTEXT_LIST,
   CONTEXT_SWITCH,
   FIND_SESSION_BY_ID,
   FIND_SESSIONS_BY_PARTIAL_ID,
+  GET_AGGREGATE_METRICS,
+  GET_ALL_PROJECTS,
+  GET_ALL_REPOSITORY_GROUPS,
+  GET_ALL_SESSIONS,
+  GET_SESSION_DETAIL_BY_CONTEXT,
+  GET_WATERFALL_DATA_BY_CONTEXT,
   HTTP_SERVER_GET_STATUS,
   HTTP_SERVER_START,
   HTTP_SERVER_STOP,
@@ -41,6 +48,7 @@ import {
 import {
   CONFIG_ADD_IGNORE_REGEX,
   CONFIG_ADD_IGNORE_REPOSITORY,
+  CONFIG_ADD_SAVED_VIEW,
   CONFIG_ADD_TRIGGER,
   CONFIG_CLEAR_SNOOZE,
   CONFIG_FIND_WSL_CLAUDE_ROOTS,
@@ -53,9 +61,12 @@ import {
   CONFIG_PIN_SESSION,
   CONFIG_REMOVE_IGNORE_REGEX,
   CONFIG_REMOVE_IGNORE_REPOSITORY,
+  CONFIG_REMOVE_SAVED_VIEW,
+  CONFIG_REMOVE_SESSION_ANNOTATION,
   CONFIG_REMOVE_TRIGGER,
   CONFIG_SELECT_CLAUDE_ROOT_FOLDER,
   CONFIG_SELECT_FOLDERS,
+  CONFIG_SET_SESSION_ANNOTATION,
   CONFIG_SNOOZE,
   CONFIG_TEST_TRIGGER,
   CONFIG_UNHIDE_SESSION,
@@ -78,6 +89,7 @@ import type {
   NotificationTrigger,
   OpenTarget,
   OpenTargetId,
+  SavedView,
   SessionsByIdsOptions,
   SessionsPaginationOptions,
   SshConfigHostEntry,
@@ -173,6 +185,22 @@ const electronAPI: ElectronAPI = {
   getRepositoryGroups: () => ipcRenderer.invoke('get-repository-groups'),
   getWorktreeSessions: (worktreeId: string) =>
     ipcRenderer.invoke('get-worktree-sessions', worktreeId),
+
+  // Aggregate (cross-backend) APIs
+  getAllProjects: () => ipcRenderer.invoke(GET_ALL_PROJECTS),
+  getAllRepositoryGroups: () => ipcRenderer.invoke(GET_ALL_REPOSITORY_GROUPS),
+  getAllSessions: (projectId: string) => ipcRenderer.invoke(GET_ALL_SESSIONS, { projectId }),
+  getSessionDetailByContext: (params: {
+    contextId: string;
+    sessionId: string;
+    projectId?: string;
+  }) => ipcRenderer.invoke(GET_SESSION_DETAIL_BY_CONTEXT, params),
+  getWaterfallDataByContext: (params: {
+    contextId: string;
+    sessionId: string;
+    projectId?: string;
+  }) => ipcRenderer.invoke(GET_WATERFALL_DATA_BY_CONTEXT, params),
+  getAggregateMetrics: () => ipcRenderer.invoke(GET_AGGREGATE_METRICS),
 
   // Validation methods
   validatePath: (relativePath: string, projectPath: string) =>
@@ -332,6 +360,21 @@ const electronAPI: ElectronAPI = {
     unhideSessions: async (projectId: string, sessionIds: string[]): Promise<void> => {
       return invokeIpcWithResult<void>(CONFIG_UNHIDE_SESSIONS, projectId, sessionIds);
     },
+    setSessionAnnotation: async (
+      key: string,
+      patch: Partial<{ tags: string[]; score: number | null; note: string }>
+    ): Promise<void> => {
+      return invokeIpcWithResult<void>(CONFIG_SET_SESSION_ANNOTATION, key, patch);
+    },
+    removeSessionAnnotation: async (key: string): Promise<void> => {
+      return invokeIpcWithResult<void>(CONFIG_REMOVE_SESSION_ANNOTATION, key);
+    },
+    addSavedView: async (view: Omit<SavedView, 'id' | 'createdAt'>): Promise<SavedView> => {
+      return invokeIpcWithResult<SavedView>(CONFIG_ADD_SAVED_VIEW, view);
+    },
+    removeSavedView: async (id: string): Promise<void> => {
+      return invokeIpcWithResult<void>(CONFIG_REMOVE_SAVED_VIEW, id);
+    },
   },
 
   // Deep link navigation
@@ -361,6 +404,20 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.on('file-change', listener);
     return (): void => {
       ipcRenderer.removeListener('file-change', listener);
+    };
+  },
+
+  // Context-tagged file change events from inactive local contexts (aggregate "All" view)
+  onContextFileChange: (
+    callback: (payload: { contextId: string; event: IpcFileChangePayload }) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      data: { contextId: string; event: IpcFileChangePayload }
+    ): void => callback(data);
+    ipcRenderer.on(CONTEXT_FILE_CHANGE, listener);
+    return (): void => {
+      ipcRenderer.removeListener(CONTEXT_FILE_CHANGE, listener);
     };
   },
 

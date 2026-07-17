@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '@renderer/api';
 import { confirm } from '@renderer/components/common/ConfirmDialog';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { generateUUID } from '@renderer/utils/stringUtils';
 import { normalizeSshAuthMethod } from '@shared/types';
@@ -31,9 +32,9 @@ const inputStyle = {
   color: 'var(--color-text)',
 };
 
-const authMethodOptions: readonly { value: SshAuthMethod; label: string }[] = [
-  { value: 'sshConfig', label: 'SSH Config (recommended)' },
-  { value: 'password', label: 'Password' },
+const authMethodOptions: readonly { value: SshAuthMethod; labelKey: string }[] = [
+  { value: 'sshConfig', labelKey: 'settings.connection.authSshConfig' },
+  { value: 'password', labelKey: 'settings.connection.authPassword' },
 ];
 
 const defaultForm = {
@@ -45,6 +46,7 @@ const defaultForm = {
 };
 
 export const WorkspaceSection = (): React.JSX.Element => {
+  const t = useT();
   const [profiles, setProfiles] = useState<SshConnectionProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -140,9 +142,9 @@ export const WorkspaceSection = (): React.JSX.Element => {
     if (!profile) return;
 
     const confirmed = await confirm({
-      title: 'Delete Profile',
-      message: `Are you sure you want to delete "${profile.name}"? This cannot be undone.`,
-      confirmLabel: 'Delete',
+      title: t('settings.workspace.deleteProfileTitle'),
+      message: t('settings.workspace.deleteProfileMessage', { name: profile.name }),
+      confirmLabel: t('common.delete'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -171,14 +173,14 @@ export const WorkspaceSection = (): React.JSX.Element => {
             className="mb-1 block text-xs"
             style={{ color: 'var(--color-text-muted)' }}
           >
-            Name
+            {t('settings.workspace.name')}
           </label>
           <input
             id="ws-profile-name"
             type="text"
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
-            placeholder="My Server"
+            placeholder={t('settings.workspace.namePlaceholder')}
             className={inputClass}
             style={inputStyle}
           />
@@ -189,14 +191,14 @@ export const WorkspaceSection = (): React.JSX.Element => {
             className="mb-1 block text-xs"
             style={{ color: 'var(--color-text-muted)' }}
           >
-            Host
+            {t('settings.workspace.host')}
           </label>
           <input
             id="ws-profile-host"
             type="text"
             value={formHost}
             onChange={(e) => setFormHost(e.target.value)}
-            placeholder="hostname or IP"
+            placeholder={t('settings.workspace.hostPlaceholder')}
             className={inputClass}
             style={inputStyle}
           />
@@ -210,7 +212,7 @@ export const WorkspaceSection = (): React.JSX.Element => {
             className="mb-1 block text-xs"
             style={{ color: 'var(--color-text-muted)' }}
           >
-            Port
+            {t('settings.workspace.port')}
           </label>
           <input
             id="ws-profile-port"
@@ -228,7 +230,7 @@ export const WorkspaceSection = (): React.JSX.Element => {
             className="mb-1 block text-xs"
             style={{ color: 'var(--color-text-muted)' }}
           >
-            Username
+            {t('settings.workspace.username')}
           </label>
           <input
             id="ws-profile-username"
@@ -245,11 +247,14 @@ export const WorkspaceSection = (): React.JSX.Element => {
       <div>
         {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- SettingsSelect is a custom dropdown without a native control */}
         <label className="mb-1 block text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          Authentication
+          {t('settings.workspace.authentication')}
         </label>
         <SettingsSelect
           value={formAuthMethod}
-          options={authMethodOptions}
+          options={authMethodOptions.map((option) => ({
+            value: option.value,
+            label: t(option.labelKey),
+          }))}
           onChange={setFormAuthMethod}
           fullWidth
         />
@@ -257,14 +262,15 @@ export const WorkspaceSection = (): React.JSX.Element => {
 
       {formAuthMethod === 'sshConfig' && (
         <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          Authentication is delegated to your <code>~/.ssh/config</code> (IdentityFile,
-          IdentityAgent, agent forwarding all honored).
+          {t('settings.workspace.sshConfigHelp1')}
+          <code>~/.ssh/config</code>
+          {t('settings.workspace.sshConfigHelp2')}
         </p>
       )}
 
       {formAuthMethod === 'password' && (
         <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          You will be prompted for the password when connecting.
+          {t('settings.workspace.passwordPromptNote')}
         </p>
       )}
 
@@ -279,7 +285,7 @@ export const WorkspaceSection = (): React.JSX.Element => {
           }}
         >
           <Save className="size-3.5" />
-          Save
+          {t('common.save')}
         </button>
         <button
           onClick={onCancel}
@@ -290,7 +296,7 @@ export const WorkspaceSection = (): React.JSX.Element => {
           }}
         >
           <X className="size-3.5" />
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </div>
@@ -298,15 +304,15 @@ export const WorkspaceSection = (): React.JSX.Element => {
 
   return (
     <div className="space-y-6">
-      <SettingsSectionHeader title="Workspace Profiles" />
+      <SettingsSectionHeader title={t('settings.workspace.profiles')} />
       <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-        Save SSH connection profiles for quick reconnection
+        {t('settings.workspace.profilesDesc')}
       </p>
 
       {loading && (
         <div className="flex items-center gap-2 py-4" style={{ color: 'var(--color-text-muted)' }}>
           <Loader2 className="size-4 animate-spin" />
-          <span className="text-sm">Loading profiles...</span>
+          <span className="text-sm">{t('settings.workspace.loadingProfiles')}</span>
         </div>
       )}
 
@@ -319,8 +325,8 @@ export const WorkspaceSection = (): React.JSX.Element => {
           }}
         >
           <Server className="mx-auto mb-2 size-8 opacity-40" />
-          <p className="text-sm">No saved profiles</p>
-          <p className="mt-1 text-xs">Add an SSH profile to connect quickly</p>
+          <p className="text-sm">{t('settings.workspace.noProfiles')}</p>
+          <p className="mt-1 text-xs">{t('settings.workspace.noProfilesHint')}</p>
         </div>
       )}
 
@@ -368,7 +374,7 @@ export const WorkspaceSection = (): React.JSX.Element => {
                   onClick={() => setEditingId(profile.id)}
                   className="shrink-0 rounded p-1 transition-colors hover:bg-surface-raised"
                   style={{ color: 'var(--color-text-muted)' }}
-                  title="Edit profile"
+                  title={t('settings.workspace.editProfile')}
                 >
                   <Edit2 className="size-3.5" />
                 </button>
@@ -376,7 +382,7 @@ export const WorkspaceSection = (): React.JSX.Element => {
                   onClick={() => void handleDelete(profile.id)}
                   className="shrink-0 rounded p-1 transition-colors hover:bg-surface-raised"
                   style={{ color: 'var(--color-text-muted)' }}
-                  title="Delete profile"
+                  title={t('settings.workspace.deleteProfile')}
                 >
                   <Trash2 className="size-3.5" />
                 </button>
@@ -406,7 +412,7 @@ export const WorkspaceSection = (): React.JSX.Element => {
               }}
             >
               <Plus className="size-3.5" />
-              Add Profile
+              {t('settings.workspace.addProfile')}
             </button>
           )}
         </div>

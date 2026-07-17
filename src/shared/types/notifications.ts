@@ -227,6 +227,42 @@ export interface TriggerTestResult {
 // =============================================================================
 
 /**
+ * Per-session user metadata (tags + score + note). Stored in the app config
+ * only — never written back to read-only session log files. Structurally
+ * identical to ConfigManager's SessionAnnotation.
+ */
+export interface SessionAnnotation {
+  /** Free-form tags */
+  tags: string[];
+  /** 0–5 star rating (null = unrated) */
+  score: number | null;
+  /** Free-form note */
+  note: string;
+  /** Unix timestamp of the last edit */
+  updatedAt: number;
+}
+
+/**
+ * A named filter preset ("saved view") capturing the sidebar filter state.
+ * Stored in the app config only. Structurally identical to ConfigManager's
+ * SavedView.
+ */
+export interface SavedView {
+  /** Stable identifier generated in the main process */
+  id: string;
+  /** User-given display name */
+  name: string;
+  /** Selected annotation filter tags */
+  tags: string[];
+  /** Minimum star score (0–5) */
+  minScore: number;
+  /** Source-backend filter: 'all' | 'claude' | 'kimi' | 'codex' */
+  sourceFilter: string;
+  /** Unix timestamp of creation */
+  createdAt: number;
+}
+
+/**
  * Application configuration settings.
  * Persisted to disk and loaded on app startup.
  */
@@ -282,6 +318,13 @@ export interface AppConfig {
     pinnedSessions: Record<string, { sessionId: string; pinnedAt: number }[]>;
     /** Hidden sessions per project. Key is projectId, value is array of hidden sessions */
     hiddenSessions: Record<string, { sessionId: string; hiddenAt: number }[]>;
+    /**
+     * Per-session annotations. Key is `${contextId}:${projectId}:${sessionId}`
+     * (see buildAnnotationKey).
+     */
+    sessionAnnotations: Record<string, SessionAnnotation>;
+    /** Named filter presets ("saved views") */
+    savedViews: SavedView[];
   };
   /** SSH connection settings */
   ssh?: {

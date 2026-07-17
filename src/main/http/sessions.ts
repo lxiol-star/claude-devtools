@@ -14,6 +14,7 @@ import { createLogger } from '@shared/utils/logger';
 
 import { coercePageLimit, validateProjectId, validateSessionId } from '../ipc/guards';
 import { DataCache } from '../services';
+import { fetchContextSessionDetail } from '../services/infrastructure/AggregateQueries';
 
 import type { SessionsByIdsOptions, SessionsPaginationOptions } from '../types';
 import type { HttpServices } from './index';
@@ -150,56 +151,11 @@ export function registerSessionRoutes(app: FastifyInstance, services: HttpServic
           return null;
         }
 
-        const safeProjectId = validatedProject.value!;
-        const safeSessionId = validatedSession.value!;
-        const cacheKey = DataCache.buildKey(safeProjectId, safeSessionId);
-
-        // Check cache first
-        let sessionDetail = services.dataCache.get(cacheKey);
-        if (sessionDetail) {
-          return sessionDetail;
-        }
-
-        const fsType = services.projectScanner.getFileSystemProvider().type;
-        // In SSH mode, avoid an extra deep metadata scan before full parse.
-        const session = await services.projectScanner.getSessionWithOptions(
-          safeProjectId,
-          safeSessionId,
-          {
-            metadataLevel: fsType === 'ssh' ? 'light' : 'deep',
-          }
+        return await fetchContextSessionDetail(
+          services,
+          validatedProject.value!,
+          validatedSession.value!
         );
-        if (!session) {
-          logger.error(`Session not found: ${safeSessionId}`);
-          return null;
-        }
-
-        // Parse session messages
-        const parsedSession = await services.sessionParser.parseSession(
-          safeProjectId,
-          safeSessionId
-        );
-
-        // Resolve subagents
-        const subagents = await services.subagentResolver.resolveSubagents(
-          safeProjectId,
-          safeSessionId,
-          parsedSession.taskCalls,
-          parsedSession.messages
-        );
-        session.hasSubagents = subagents.length > 0;
-
-        // Build session detail with chunks
-        sessionDetail = services.chunkBuilder.buildSessionDetail(
-          session,
-          parsedSession.messages,
-          subagents
-        );
-
-        // Cache the result
-        services.dataCache.set(cacheKey, sessionDetail);
-
-        return sessionDetail;
       } catch (error) {
         logger.error(
           `Error in GET session-detail for ${request.params.projectId}/${request.params.sessionId}:`,

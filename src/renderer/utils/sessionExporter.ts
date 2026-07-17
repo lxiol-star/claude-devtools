@@ -12,7 +12,7 @@ import type { ContentBlock } from '@shared/types';
 // Types
 // =============================================================================
 
-export type ExportFormat = 'markdown' | 'json' | 'plaintext';
+export type ExportFormat = 'markdown' | 'json' | 'plaintext' | 'fixtures';
 
 interface ExtractOptions {
   includeThinking?: boolean;
@@ -396,6 +396,67 @@ export function exportAsJson(detail: SessionDetail): string {
   return JSON.stringify(detail, null, 2);
 }
 
+/** One extracted test-case fixture: a tool call with its preceding prompt. */
+export interface SessionFixture {
+  /** Most recent user prompt text preceding this tool call (context) */
+  prompt: string;
+  /** Tool name */
+  toolName: string;
+  /** Tool input parameters */
+  input: Record<string, unknown>;
+  /** Tool result output as text (empty when no result) */
+  output: string;
+  /** Whether the tool result was an error */
+  isError: boolean;
+}
+
+/**
+ * Extracts structured test-case fixtures from a session: one entry per tool
+ * execution, paired with the most recent user prompt for context. This mirrors
+ * Langfuse's "build a dataset from real traces" idea, adapted to local logs —
+ * the output is a clean JSON array suitable for external test harnesses, not a
+ * dump of the whole SessionDetail (use exportAsJson for that).
+ */
+export function extractFixtures(detail: SessionDetail): SessionFixture[] {
+  const fixtures: SessionFixture[] = [];
+  let currentPrompt = '';
+
+  for (const chunk of detail.chunks) {
+    if (chunk.chunkType === 'user') {
+      const text = extractTextFromContent(chunk.userMessage.content).trim();
+      if (text) {
+        currentPrompt = text;
+      }
+      continue;
+    }
+    if (chunk.chunkType !== 'ai') {
+      continue;
+    }
+    for (const exec of chunk.toolExecutions) {
+      const result = exec.result;
+      const output = result
+        ? typeof result.content === 'string'
+          ? result.content
+          : extractTextFromContent(result.content as ContentBlock[])
+        : '';
+      fixtures.push({
+        prompt: currentPrompt,
+        toolName: exec.toolCall.name,
+        input: exec.toolCall.input,
+        output,
+        isError: result?.isError ?? false,
+      });
+    }
+  }
+
+  return fixtures;
+}
+
+/** Serializes the extracted fixtures as a pretty-printed JSON array. */
+export function exportAsFixtures(detail: SessionDetail): string {
+  return JSON.stringify(extractFixtures(detail), null, 2);
+}
+
 /**
  * Trigger a browser file download for the given session in the specified format.
  *
@@ -410,6 +471,7 @@ export function triggerDownload(detail: SessionDetail, format: ExportFormat): vo
     markdown: { fn: exportAsMarkdown, ext: 'md', mime: 'text/markdown;charset=utf-8' },
     json: { fn: exportAsJson, ext: 'json', mime: 'application/json;charset=utf-8' },
     plaintext: { fn: exportAsPlainText, ext: 'txt', mime: 'text/plain;charset=utf-8' },
+    fixtures: { fn: exportAsFixtures, ext: 'fixtures.json', mime: 'application/json;charset=utf-8' },
   };
 
   const { fn, ext, mime } = formatters[format];

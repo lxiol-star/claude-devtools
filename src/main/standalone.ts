@@ -8,25 +8,26 @@
  * Environment variables:
  * - HOST: Bind address (default '0.0.0.0')
  * - PORT: Listen port (default 3456)
- * - CLAUDE_ROOT: Path to .claude directory (default ~/.claude)
+ * - DATA_ROOT: Path to agent data root (~/.claude, ~/.kimi-code, ~/.codex)
+ * - CLAUDE_ROOT: Legacy path to .claude directory (default ~/.claude)
  * - CORS_ORIGIN: CORS origin policy (default '*')
  */
 
 import { createLogger } from '@shared/utils/logger';
 import * as path from 'path';
 
+import { ConfigManager } from './services/infrastructure/ConfigManager';
 import { HttpServer } from './services/infrastructure/HttpServer';
+import { LocalFileSystemProvider } from './services/infrastructure/LocalFileSystemProvider';
+import { NotificationManager } from './services/infrastructure/NotificationManager';
+import { ServiceContext } from './services/infrastructure/ServiceContext';
+import { ServiceContextRegistry } from './services/infrastructure/ServiceContextRegistry';
 import {
   getProjectsBasePath,
   getTodosBasePath,
   setClaudeBasePathOverride,
 } from './utils/pathDecoder';
-import {
-  ConfigManager,
-  LocalFileSystemProvider,
-  NotificationManager,
-  ServiceContext,
-} from './services';
+import { detectBackend } from './backends';
 
 import type { HttpServices } from './http';
 import type { SshConnectionManager } from './services/infrastructure/SshConnectionManager';
@@ -40,6 +41,7 @@ const logger = createLogger('Standalone');
 
 const HOST = process.env.HOST ?? '0.0.0.0';
 const PORT = parseInt(process.env.PORT ?? '3456', 10);
+const DATA_ROOT = process.env.DATA_ROOT;
 const CLAUDE_ROOT = process.env.CLAUDE_ROOT;
 
 // Default CORS to allow all in standalone mode (Docker isolation replaces CORS)
@@ -85,6 +87,7 @@ const sshConnectionManagerStub = {
 // =============================================================================
 
 let localContext: ServiceContext;
+let contextRegistry: ServiceContextRegistry;
 let notificationManager: NotificationManager;
 let httpServer: HttpServer;
 
@@ -102,14 +105,33 @@ async function start(): Promise<void> {
     : undefined;
   await ConfigManager.initializeInstance(configPath);
 
-  // Apply Claude root override if set
-  if (CLAUDE_ROOT) {
-    setClaudeBasePathOverride(CLAUDE_ROOT);
-    logger.info(`Using CLAUDE_ROOT: ${CLAUDE_ROOT}`);
-  }
+  // Resolve data directories. DATA_ROOT is the generic switch for any supported
+  // backend (Claude, Kimi, Codex). CLAUDE_ROOT is kept for backward compatibility.
+  let projectsDir: string;
+  let todosDir: string;
 
-  const projectsDir = getProjectsBasePath();
-  const todosDir = getTodosBasePath();
+  if (DATA_ROOT) {
+    const backendName = detectBackend(DATA_ROOT, new LocalFileSystemProvider());
+    switch (backendName) {
+      case 'kimi':
+      case 'codex':
+        projectsDir = path.join(DATA_ROOT, 'sessions');
+        todosDir = path.join(DATA_ROOT, 'todos');
+        break;
+      case 'claude':
+      default:
+        projectsDir = path.join(DATA_ROOT, 'projects');
+        todosDir = path.join(DATA_ROOT, 'todos');
+    }
+    logger.info(`Using DATA_ROOT: ${DATA_ROOT} (backend: ${backendName ?? 'unknown'})`);
+  } else {
+    if (CLAUDE_ROOT) {
+      setClaudeBasePathOverride(CLAUDE_ROOT);
+      logger.info(`Using CLAUDE_ROOT: ${CLAUDE_ROOT}`);
+    }
+    projectsDir = getProjectsBasePath();
+    todosDir = getTodosBasePath();
+  }
 
   logger.info(`Projects directory: ${projectsDir}`);
   logger.info(`Todos directory: ${todosDir}`);
@@ -123,6 +145,11 @@ async function start(): Promise<void> {
     todosDir,
   });
   localContext.start();
+
+  // Register the context in a registry so aggregate (cross-backend) HTTP
+  // routes work uniformly — with a single context they equal single-source results.
+  contextRegistry = new ServiceContextRegistry();
+  contextRegistry.registerContext(localContext);
 
   // Initialize notification manager
   notificationManager = NotificationManager.getInstance();
@@ -163,6 +190,7 @@ async function start(): Promise<void> {
     memoryReader: localContext.memoryReader,
     updaterService: updaterServiceStub,
     sshConnectionManager: sshConnectionManagerStub,
+    contextRegistry,
   };
 
   // No-op mode switch handler (no SSH in standalone)
@@ -181,7 +209,10 @@ async function shutdown(): Promise<void> {
     await httpServer.stop();
   }
 
-  if (localContext) {
+  // Disposing the registry disposes all registered contexts (including local).
+  if (contextRegistry) {
+    contextRegistry.dispose();
+  } else if (localContext) {
     localContext.dispose();
   }
 

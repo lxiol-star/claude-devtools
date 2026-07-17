@@ -4,6 +4,7 @@
  */
 
 import { WORKTREE_BADGE_BG, WORKTREE_BADGE_TEXT } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 
 import type { WorktreeSource } from '@renderer/types/data';
 
@@ -69,9 +70,9 @@ const SOURCE_CONFIG: Record<WorktreeSource, SourceConfig> = {
   },
 };
 
-// Default worktree badge config (not "Main" to avoid confusion with main branch)
-const DEFAULT_CONFIG: SourceConfig = {
-  label: 'Default',
+// Default worktree badge config (not "Main" to avoid confusion with main branch).
+// Label is resolved via i18n at render time (layout.worktreeDefault).
+const DEFAULT_CONFIG: Omit<SourceConfig, 'label'> = {
   bgColor: 'rgba(82, 82, 91, 0.3)', // zinc-600
   textColor: '#71717a', // zinc-500
 };
@@ -81,6 +82,8 @@ export const WorktreeBadge = ({
   isMain = false,
   className = '',
 }: Readonly<WorktreeBadgeProps>): React.ReactElement | null => {
+  const t = useT();
+
   // Show Default badge if isMain is true (the default/primary worktree)
   if (isMain) {
     return (
@@ -91,7 +94,7 @@ export const WorktreeBadge = ({
           color: DEFAULT_CONFIG.textColor,
         }}
       >
-        {DEFAULT_CONFIG.label}
+        {t('layout.worktreeDefault')}
       </span>
     );
   }
@@ -110,7 +113,7 @@ export const WorktreeBadge = ({
         backgroundColor: config.bgColor,
         color: config.textColor,
       }}
-      title={`Created by ${config.label}`}
+      title={t('layout.createdBy', { label: config.label })}
     >
       {config.label}
     </span>

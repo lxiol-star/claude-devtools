@@ -37,6 +37,9 @@ export interface TabUIState {
   /** Whether the context panel is visible */
   showContextPanel: boolean;
 
+  /** Whether the timeline (Gantt) panel is visible */
+  showTimelinePanel: boolean;
+
   /** Selected context phase for filtering (null = current/latest phase) */
   selectedContextPhase: number | null;
 
@@ -53,6 +56,7 @@ function createDefaultTabUIState(): TabUIState {
     expandedDisplayItemIds: new Map(),
     expandedSubagentTraceIds: new Set(),
     showContextPanel: false,
+    showTimelinePanel: false,
     selectedContextPhase: null,
     savedScrollTop: undefined,
   };
@@ -101,6 +105,12 @@ export interface TabUISlice {
   setContextPanelVisibleForTab: (tabId: string, visible: boolean) => void;
   /** Get context panel visibility for a specific tab */
   isContextPanelVisibleForTab: (tabId: string) => boolean;
+
+  // Timeline panel (per-tab)
+  /** Set timeline panel visibility for a specific tab */
+  setTimelinePanelVisibleForTab: (tabId: string, visible: boolean) => void;
+  /** Get timeline panel visibility for a specific tab */
+  isTimelinePanelVisibleForTab: (tabId: string) => boolean;
 
   // Context phase selection (per-tab)
   /** Set the selected context phase for a specific tab */
@@ -285,6 +295,24 @@ export const createTabUISlice: StateCreator<AppState, [], [], TabUISlice> = (set
   isContextPanelVisibleForTab: (tabId: string) => {
     const tabState = get().tabUIStates.get(tabId);
     return tabState?.showContextPanel ?? false;
+  },
+
+  // ==========================================================================
+  // Timeline Panel
+  // ==========================================================================
+
+  setTimelinePanelVisibleForTab: (tabId: string, visible: boolean) => {
+    const state = get();
+    const newMap = new Map(state.tabUIStates);
+    const tabState = newMap.get(tabId) ?? createDefaultTabUIState();
+
+    newMap.set(tabId, { ...tabState, showTimelinePanel: visible });
+    set({ tabUIStates: newMap });
+  },
+
+  isTimelinePanelVisibleForTab: (tabId: string) => {
+    const tabState = get().tabUIStates.get(tabId);
+    return tabState?.showTimelinePanel ?? false;
   },
 
   // ==========================================================================

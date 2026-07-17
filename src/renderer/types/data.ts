@@ -16,6 +16,10 @@
 
 // Domain types
 export type {
+  AggregateBackendStat,
+  AggregateMetrics,
+  AggregateMetricsBucket,
+  AggregateProjectStat,
   PhaseTokenBreakdown,
   Project,
   RepositoryGroup,
@@ -61,6 +65,7 @@ export type {
   AppConfig,
   DetectedError,
   NotificationTrigger,
+  SavedView,
   TriggerContentType,
   TriggerMatchField,
   TriggerMode,

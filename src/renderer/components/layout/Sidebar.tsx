@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -25,6 +26,7 @@ const MAX_WIDTH = 500;
 const DEFAULT_WIDTH = 280;
 
 export const Sidebar = (): React.JSX.Element | null => {
+  const t = useT();
   const { projects, projectsLoading, fetchProjects, sidebarCollapsed } = useStore(
     useShallow((s) => ({
       projects: s.projects,
@@ -113,7 +115,7 @@ export const Sidebar = (): React.JSX.Element | null => {
       {/* Resize handle */}
       <button
         type="button"
-        aria-label="Resize sidebar"
+        aria-label={t('layout.resizeSidebar')}
         className={`absolute right-0 top-0 h-full w-1 cursor-col-resize border-0 bg-transparent p-0 transition-colors hover:bg-blue-500/50 ${
           isResizing ? 'bg-blue-500/50' : ''
         }`}

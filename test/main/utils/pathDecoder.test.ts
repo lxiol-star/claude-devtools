@@ -12,6 +12,7 @@ import {
   getProjectsBasePath,
   getTodosBasePath,
   isValidEncodedPath,
+  isValidProjectId,
 } from '../../../src/main/utils/pathDecoder';
 
 describe('pathDecoder', () => {
@@ -156,6 +157,45 @@ describe('pathDecoder', () => {
     it('should return false for misplaced colons', () => {
       expect(isValidEncodedPath('-Users-username:project')).toBe(false);
       expect(isValidEncodedPath('-C:-Users-name-project:extra')).toBe(false);
+    });
+  });
+
+  describe('isValidProjectId', () => {
+    it('should accept Claude dash-encoded project IDs', () => {
+      expect(isValidProjectId('-Users-username-projectname')).toBe(true);
+    });
+
+    it('should accept Kimi/Codex base64url-encoded project IDs', () => {
+      expect(
+        isValidProjectId(
+          Buffer.from('/Users/wyj/project/code/github', 'utf8').toString('base64url')
+        )
+      ).toBe(true);
+    });
+
+    it('should accept composite Claude IDs', () => {
+      expect(isValidProjectId('-Users-username-projectname::a1b2c3d4')).toBe(true);
+    });
+
+    it('should accept composite base64url IDs', () => {
+      expect(
+        isValidProjectId(
+          `${Buffer.from('/Users/wyj/project/code/github', 'utf8').toString('base64url')}::a1b2c3d4`
+        )
+      ).toBe(true);
+    });
+
+    it('should reject empty string', () => {
+      expect(isValidProjectId('')).toBe(false);
+    });
+
+    it('should reject invalid characters', () => {
+      expect(isValidProjectId('-Users-username-proj!ect')).toBe(false);
+      expect(isValidProjectId('L1VzZXJzL3d5ai9wcm9qZWN0L2NvZGUvZ2l0aHVi+')).toBe(false);
+    });
+
+    it('should reject composite IDs with bad hash suffix', () => {
+      expect(isValidProjectId('-Users-username-projectname::badhash')).toBe(false);
     });
   });
 

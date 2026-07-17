@@ -1,8 +1,9 @@
 /**
  * SidebarHeader - Linear-style header with project name and worktree selector.
  *
- * Layout (2 stacked horizontal bars):
+ * Layout (2 stacked horizontal bars + optional chip row):
  * - Row 1: Project name (left-aligned after macOS traffic lights)
+ * - Source filter chips (only when multiple local data roots exist)
  * - Row 2: Worktree selector (full-width button)
  *
  * Visual requirements:
@@ -15,14 +16,19 @@ import { useEffect, useRef, useState } from 'react';
 
 import { isElectronMode } from '@renderer/api';
 import { HEADER_ROW1_HEIGHT, HEADER_ROW2_HEIGHT } from '@renderer/constants/layout';
+import { SOURCE_COLORS, SOURCE_ORDER } from '@renderer/constants/sourceColors';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
+import { projectMatchesSource } from '@renderer/utils/sourceFilter';
 import { formatShortcut, truncateMiddle } from '@renderer/utils/stringUtils';
 import { Check, ChevronDown, GitBranch, PanelLeft } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { WorktreeBadge } from '../common/WorktreeBadge';
+import { AnnotationFilterBar } from '../sidebar/AnnotationFilterBar';
 
 import type { Worktree, WorktreeSource } from '@renderer/types/data';
+import type { DataBackendName } from '@shared/types/api';
 
 /**
  * Group worktrees by source for organized dropdown display.
@@ -195,6 +201,7 @@ const ProjectDropdownItem = ({
 };
 
 export const SidebarHeader = (): React.JSX.Element => {
+  const t = useT();
   const isMacElectron =
     isElectronMode() && window.navigator.userAgent.toLowerCase().includes('mac');
 
@@ -211,6 +218,10 @@ export const SidebarHeader = (): React.JSX.Element => {
     fetchRepositoryGroups,
     fetchProjects,
     toggleSidebar,
+    availableContexts,
+    activeContextId,
+    sourceFilter,
+    setSourceFilter,
   } = useStore(
     useShallow((s) => ({
       repositoryGroups: s.repositoryGroups,
@@ -225,6 +236,10 @@ export const SidebarHeader = (): React.JSX.Element => {
       fetchRepositoryGroups: s.fetchRepositoryGroups,
       fetchProjects: s.fetchProjects,
       toggleSidebar: s.toggleSidebar,
+      availableContexts: s.availableContexts,
+      activeContextId: s.activeContextId,
+      sourceFilter: s.sourceFilter,
+      setSourceFilter: s.setSourceFilter,
     }))
   );
 
@@ -245,8 +260,10 @@ export const SidebarHeader = (): React.JSX.Element => {
   // Find the active repository and worktree
   const activeRepo = repositoryGroups.find((r) => r.id === selectedRepositoryId);
   const activeWorktree = activeRepo?.worktrees.find((w) => w.id === selectedWorktreeId);
-  // Filter worktrees to only show those with sessions
-  const worktrees = (activeRepo?.worktrees ?? []).filter((w) => w.sessions.length > 0);
+  // Filter worktrees to those with sessions, then by the active source chip.
+  const worktrees = (activeRepo?.worktrees ?? []).filter(
+    (w) => w.sessions.length > 0 && projectMatchesSource(w, sourceFilter)
+  );
   const hasMultipleWorktrees = worktrees.length > 1;
 
   // Group worktrees by source for organized dropdown
@@ -260,8 +277,8 @@ export const SidebarHeader = (): React.JSX.Element => {
   // Get display name
   const projectName =
     viewMode === 'grouped'
-      ? (activeRepo?.name ?? 'Select Project')
-      : (activeProject?.name ?? 'Select Project');
+      ? (activeRepo?.name ?? t('layout.selectProject'))
+      : (activeProject?.name ?? t('layout.selectProject'));
 
   const worktreeName = activeWorktree?.name ?? 'main';
   const hasSelection = viewMode === 'grouped' ? !!activeRepo : !!activeProject;
@@ -313,13 +330,51 @@ export const SidebarHeader = (): React.JSX.Element => {
     setIsProjectDropdownOpen(false);
   };
 
-  // Items for project dropdown - filter out repositories/projects with 0 sessions
+  // Items for project dropdown - drop empty repos/projects, then apply the
+  // active source chip (client-side filter over the aggregate data).
   const projectItems =
     viewMode === 'grouped'
-      ? repositoryGroups.filter((r) => r.totalSessions > 0)
-      : projects.filter((p) => p.sessions.length > 0);
+      ? repositoryGroups.filter(
+          (r) => r.totalSessions > 0 && projectMatchesSource(r, sourceFilter)
+        )
+      : projects.filter((p) => p.sessions.length > 0 && projectMatchesSource(p, sourceFilter));
 
   const [isCollapseHovered, setIsCollapseHovered] = useState(false);
+
+  // Source filter chips: 'All' + one chip per backend present (deduped, fixed order).
+  // Hidden entirely when only one local source exists (same spirit as the old
+  // hasMultipleSources guard).
+  const localContexts = availableContexts.filter((ctx) => ctx.type === 'local');
+  // Chips are a client-side filter over local aggregate data — only meaningful
+  // when multiple local sources exist AND a local context is active (source
+  // filtering has no meaning while an SSH workspace is active).
+  const activeContext = availableContexts.find((ctx) => ctx.id === activeContextId);
+  const hasMultipleSources = localContexts.length > 1 && activeContext?.type === 'local';
+  const backendChips = SOURCE_ORDER.filter((backend) =>
+    localContexts.some((ctx) => ctx.backend === backend)
+  );
+
+  const chipStyle = (active: boolean, color?: string): React.CSSProperties => {
+    if (active && color) {
+      return {
+        backgroundColor: `${color}22`,
+        borderColor: `${color}66`,
+        color,
+      };
+    }
+    if (active) {
+      return {
+        backgroundColor: 'var(--color-surface-raised)',
+        borderColor: 'var(--color-border-emphasis)',
+        color: 'var(--color-text)',
+      };
+    }
+    return {
+      backgroundColor: 'transparent',
+      borderColor: 'var(--color-border)',
+      color: 'var(--color-text-muted)',
+    };
+  };
 
   return (
     <div
@@ -369,7 +424,7 @@ export const SidebarHeader = (): React.JSX.Element => {
               backgroundColor: isCollapseHovered ? 'var(--color-surface-raised)' : 'transparent',
             } as React.CSSProperties
           }
-          title={`Collapse sidebar (${formatShortcut('B')})`}
+          title={t('layout.collapseSidebar', { shortcut: formatShortcut('B') })}
         >
           <PanelLeft className="size-4" />
         </button>
@@ -395,12 +450,14 @@ export const SidebarHeader = (): React.JSX.Element => {
                 className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--color-text-muted)' }}
               >
-                Switch {viewMode === 'grouped' ? 'Repository' : 'Project'}
+                {t(viewMode === 'grouped' ? 'layout.switchRepository' : 'layout.switchProject')}
               </div>
 
               {projectItems.length === 0 ? (
                 <div className="p-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  No {viewMode === 'grouped' ? 'repositories' : 'projects'} found
+                  {t(
+                    viewMode === 'grouped' ? 'layout.noRepositoriesFound' : 'layout.noProjectsFound'
+                  )}
                 </div>
               ) : (
                 projectItems.map((item) => {
@@ -438,6 +495,51 @@ export const SidebarHeader = (): React.JSX.Element => {
           </>
         )}
       </div>
+
+      {/* Source filter chips (only when multiple local data roots exist) */}
+      {hasMultipleSources && (
+        <div
+          className="flex w-full flex-wrap items-center gap-1 px-3 pb-1.5"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          <button
+            onClick={() => setSourceFilter('all')}
+            className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-opacity hover:opacity-80"
+            style={{
+              ...chipStyle(sourceFilter === 'all', '#818cf8'),
+              borderStyle: 'solid',
+              borderWidth: '1px',
+            }}
+          >
+            {t('layout.filterAll')}
+          </button>
+          {backendChips.map((backend: DataBackendName) => {
+            const color = SOURCE_COLORS[backend];
+            const active = sourceFilter === backend;
+            return (
+              <button
+                key={backend}
+                onClick={() => setSourceFilter(backend)}
+                className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-opacity hover:opacity-80"
+                style={{
+                  ...chipStyle(active, color),
+                  borderStyle: 'solid',
+                  borderWidth: '1px',
+                }}
+              >
+                <span
+                  className="size-1.5 rounded-full"
+                  style={{ backgroundColor: active ? color : 'var(--color-text-muted)' }}
+                />
+                {t(`layout.source.${backend}`)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Annotation filter (tags + min score) — hidden until annotations exist */}
+      <AnnotationFilterBar />
 
       {/* ROW 2: Worktree Selector (Full Width) */}
       {viewMode === 'grouped' && activeRepo && (
@@ -498,7 +600,7 @@ export const SidebarHeader = (): React.JSX.Element => {
                   className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--color-text-muted)' }}
                 >
-                  Switch Worktree
+                  {t('layout.switchWorktree')}
                 </div>
 
                 {/* Main worktree first */}
@@ -523,7 +625,7 @@ export const SidebarHeader = (): React.JSX.Element => {
                         color: 'var(--color-text-muted)',
                       }}
                     >
-                      {group.label}
+                      {group.source === 'unknown' ? t('layout.other') : group.label}
                     </div>
                     {/* Worktrees in group */}
                     {group.worktrees.map((worktree) => (

@@ -11,10 +11,12 @@ import type {
   AppConfig,
   DetectedError,
   NotificationTrigger,
+  SavedView,
   TriggerTestResult,
 } from './notifications';
 import type { WaterfallData } from './visualization';
 import type {
+  AggregateMetrics,
   ConversationGroup,
   FileChangeEvent,
   FindSessionByIdResult,
@@ -118,6 +120,30 @@ export interface ConfigAPI {
   hideSessions: (projectId: string, sessionIds: string[]) => Promise<void>;
   /** Bulk unhide sessions for a project */
   unhideSessions: (projectId: string, sessionIds: string[]) => Promise<void>;
+  /** Set (merge) a session annotation, keyed by buildAnnotationKey(...) */
+  setSessionAnnotation: (
+    key: string,
+    patch: Partial<{ tags: string[]; score: number | null; note: string }>
+  ) => Promise<void>;
+  /** Remove a session annotation, keyed by buildAnnotationKey(...) */
+  removeSessionAnnotation: (key: string) => Promise<void>;
+  /** Add a saved view (named filter preset); returns the created view */
+  addSavedView: (view: Omit<SavedView, 'id' | 'createdAt'>) => Promise<SavedView>;
+  /** Remove a saved view by id */
+  removeSavedView: (id: string) => Promise<void>;
+}
+
+export type DataBackendName = 'claude' | 'kimi' | 'codex';
+
+export interface KnownDataRoot {
+  /** Display label, e.g. "Claude Code" */
+  label: string;
+  /** Backend identifier detected for this root */
+  backend: DataBackendName;
+  /** Absolute path to the data root */
+  path: string;
+  /** Whether the directory currently exists on disk */
+  exists: boolean;
 }
 
 export interface ClaudeRootInfo {
@@ -127,6 +153,10 @@ export interface ClaudeRootInfo {
   resolvedPath: string;
   /** Custom override path from settings (null means auto-detect) */
   customPath: string | null;
+  /** Backend detected for the resolved path (which agent produced the sessions) */
+  backend?: DataBackendName;
+  /** Well-known data roots (Claude/Kimi/Codex) detected on this machine */
+  knownRoots?: KnownDataRoot[];
 }
 
 export interface ClaudeRootFolderSelection {
@@ -207,6 +237,10 @@ export interface UpdaterAPI {
 export interface ContextInfo {
   id: string;
   type: 'local' | 'ssh';
+  /** Display label, if the main process assigned one */
+  label?: string;
+  /** Data backend for local contexts (which agent produced the sessions) */
+  backend?: DataBackendName;
 }
 
 // =============================================================================
@@ -401,6 +435,25 @@ export interface ElectronAPI {
   getRepositoryGroups: () => Promise<RepositoryGroup[]>;
   getWorktreeSessions: (worktreeId: string) => Promise<Session[]>;
 
+  // Aggregate (cross-backend) APIs — mixed view over all local backend contexts.
+  // Returned entities carry `contextId` / `sourceBackend` origin tags where unambiguous.
+  getAllProjects: () => Promise<Project[]>;
+  getAllRepositoryGroups: () => Promise<RepositoryGroup[]>;
+  getAllSessions: (projectId: string) => Promise<Session[]>;
+  getSessionDetailByContext: (params: {
+    contextId: string;
+    sessionId: string;
+    projectId?: string;
+  }) => Promise<SessionDetailResponse | null>;
+  getWaterfallDataByContext: (params: {
+    contextId: string;
+    sessionId: string;
+    projectId?: string;
+  }) => Promise<WaterfallData | null>;
+  // Cross-session dashboard metrics aggregated from cheap list data across all
+  // local backend contexts (session/message/token volume — not cost).
+  getAggregateMetrics: () => Promise<AggregateMetrics>;
+
   // Validation methods
   validatePath: (
     relativePath: string,
@@ -439,6 +492,10 @@ export interface ElectronAPI {
   // File change events (real-time updates)
   onFileChange: (callback: (event: FileChangeEvent) => void) => () => void;
   onTodoChange: (callback: (event: FileChangeEvent) => void) => () => void;
+  // Context-tagged file change events from inactive local contexts (aggregate "All" view)
+  onContextFileChange: (
+    callback: (payload: { contextId: string; event: FileChangeEvent }) => void
+  ) => () => void;
 
   // Session refresh (Ctrl+R / Cmd+R intercepted by main process)
   onSessionRefresh: (callback: () => void) => () => void;

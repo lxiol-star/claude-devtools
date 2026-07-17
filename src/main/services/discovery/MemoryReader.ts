@@ -15,17 +15,17 @@
  * All reads are constrained to the resolved memory directory and `.md` files.
  */
 
+import { ClaudeBackend } from '@main/backends/ClaudeBackend';
 import { LocalFileSystemProvider } from '@main/services/infrastructure/LocalFileSystemProvider';
-import { extractBaseDir, getProjectsBasePath } from '@main/utils/pathDecoder';
 import { createLogger } from '@shared/utils/logger';
 import { type MemoryIndex, parseMemoryIndex } from '@shared/utils/memoryIndex';
 import * as path from 'path';
 
+import type { DataBackend } from '@main/backends/DataBackend';
 import type { FileSystemProvider } from '@main/services/infrastructure/FileSystemProvider';
 
 const logger = createLogger('Discovery:MemoryReader');
 
-const MEMORY_DIR_NAME = 'memory';
 const INDEX_FILE_NAME = 'MEMORY.md';
 
 export interface MemoryFile {
@@ -35,16 +35,28 @@ export interface MemoryFile {
 }
 
 export class MemoryReader {
-  private readonly projectsDir: string;
+  private readonly backend: DataBackend;
   private readonly fsProvider: FileSystemProvider;
 
-  constructor(projectsDir?: string, fsProvider?: FileSystemProvider) {
-    this.projectsDir = projectsDir ?? getProjectsBasePath();
+  constructor(projectsDir?: string, fsProvider?: FileSystemProvider, backend?: DataBackend) {
     this.fsProvider = fsProvider ?? new LocalFileSystemProvider();
+    this.backend =
+      backend ??
+      new ClaudeBackend({
+        rootPath: projectsDir ? path.dirname(projectsDir) : '',
+        fsProvider: this.fsProvider,
+        projectsDir,
+        todosDir: projectsDir ? path.join(path.dirname(projectsDir), 'todos') : undefined,
+      });
   }
 
   getDirPath(projectId: string): string {
-    return path.join(this.projectsDir, extractBaseDir(projectId), MEMORY_DIR_NAME);
+    const dir = this.backend.getMemoryDir(projectId);
+    if (dir) {
+      return dir;
+    }
+    // Fallback for backward compatibility (should not happen in practice).
+    return path.join(this.backend.rootPath, projectId);
   }
 
   getFilePath(projectId: string, fileName: string): string {
@@ -59,15 +71,7 @@ export class MemoryReader {
   }
 
   async hasMemory(projectId: string): Promise<boolean> {
-    const dir = this.getDirPath(projectId);
-    if (!(await this.fsProvider.exists(dir))) return false;
-    try {
-      const entries = await this.fsProvider.readdir(dir);
-      return entries.some((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.md'));
-    } catch (error) {
-      logger.error(`Failed to probe memory dir for ${projectId}:`, error);
-      return false;
-    }
+    return this.backend.hasMemory(projectId);
   }
 
   async readIndex(projectId: string): Promise<MemoryIndex | null> {

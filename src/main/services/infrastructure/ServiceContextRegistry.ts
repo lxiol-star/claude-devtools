@@ -4,14 +4,15 @@
  * Responsibilities:
  * - Register and track all ServiceContext instances (local + SSH)
  * - Track active context ID
- * - Handle context switching (stop old watcher, start new watcher)
+ * - Handle context switching (pause/resume SSH watchers; local-type contexts
+ *   keep watching so the aggregate "All" view updates from every backend)
  * - Enforce lifecycle rules (local context cannot be destroyed)
  * - Provide safe disposal of contexts
  *
  * Lifecycle:
  * - App startup: registry created, local context registered
  * - SSH connect: new SSH context registered
- * - Context switch: switch() stops old watcher, starts new watcher
+ * - Context switch: switch() pauses/resumes SSH watchers; local-type watchers run always
  * - SSH disconnect: destroy() removes SSH context
  * - App shutdown: dispose() cleans up all contexts
  */
@@ -19,6 +20,8 @@
 import { createLogger } from '@shared/utils/logger';
 
 import { type ServiceContext } from './ServiceContext';
+
+import type { DataBackendName } from '@shared/types/api';
 
 const logger = createLogger('Infrastructure:ServiceContextRegistry');
 
@@ -110,7 +113,10 @@ export class ServiceContextRegistry {
 
   /**
    * Switches to a different context.
-   * Stops the file watcher on the previous context and starts it on the new one.
+   * Pauses the file watcher on the previous context (SSH only — local-type
+   * contexts keep watching even while inactive so the aggregate "All" view
+   * receives live updates from every local backend) and starts it on the
+   * new one.
    *
    * @param contextId - ID of context to switch to
    * @returns Object containing previous and current contexts for IPC re-init
@@ -131,14 +137,20 @@ export class ServiceContextRegistry {
 
     logger.info(`Switching context: ${previous.id} → ${current.id}`);
 
-    // Stop file watcher on previous context (pause, don't dispose)
-    previous.stopFileWatcher();
+    // Pause file watcher on previous context (don't dispose). Local-type
+    // contexts stay running: their events are forwarded on the context-tagged
+    // channel for the aggregate "All" view.
+    if (previous.type !== 'local') {
+      previous.stopFileWatcher();
+    }
 
     // Update active context
     this.activeContextId = contextId;
 
-    // Start file watcher on new context
-    current.startFileWatcher();
+    // Start file watcher on new context (local-type contexts were never paused)
+    if (current.type !== 'local') {
+      current.startFileWatcher();
+    }
 
     logger.info(`Context switched: ${current.id} is now active`);
 
@@ -176,7 +188,8 @@ export class ServiceContextRegistry {
       logger.info('Destroyed context was active, switching to local');
       this.activeContextId = 'local';
       const local = this.contexts.get('local');
-      if (local) {
+      // Local-type watchers are never paused, so only resume non-local ones.
+      if (local && local.type !== 'local') {
         local.startFileWatcher();
       }
     }
@@ -188,10 +201,11 @@ export class ServiceContextRegistry {
    * Lists all registered contexts.
    * @returns Array of context metadata
    */
-  list(): { id: string; type: 'local' | 'ssh' }[] {
+  list(): { id: string; type: 'local' | 'ssh'; backend?: DataBackendName }[] {
     return Array.from(this.contexts.values()).map((context) => ({
       id: context.id,
       type: context.type,
+      backend: context.backendName,
     }));
   }
 

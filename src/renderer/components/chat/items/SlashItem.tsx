@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { useT } from '@renderer/i18n';
 import { Slash } from 'lucide-react';
 
 import { MarkdownViewer } from '../viewers';
@@ -38,6 +39,7 @@ export const SlashItem: React.FC<SlashItemProps> = ({
   highlightStyle,
   notificationDotColor,
 }) => {
+  const t = useT();
   const hasInstructions = !!slash.instructions;
 
   // Display args or message as the description
@@ -49,7 +51,6 @@ export const SlashItem: React.FC<SlashItemProps> = ({
       label={`/${slash.name}`}
       summary={description}
       tokenCount={slash.instructionsTokenCount}
-      tokenLabel="tokens"
       status={hasInstructions ? 'ok' : undefined}
       onClick={onClick}
       isExpanded={isExpanded}
@@ -61,7 +62,7 @@ export const SlashItem: React.FC<SlashItemProps> = ({
       {hasInstructions && (
         <MarkdownViewer
           content={slash.instructions!}
-          label="Slash Output"
+          label={t('chat.slash.output')}
           maxHeight="max-h-96"
           copyable
         />

@@ -10,6 +10,8 @@
 
 import { type UsageMetadata } from './jsonl';
 
+import type { DataBackendName } from '@shared/types/api';
+
 // =============================================================================
 // Application-Specific Type Aliases
 // =============================================================================
@@ -57,6 +59,17 @@ export interface Project {
   createdAt: number;
   /** Unix timestamp of most recent session activity */
   mostRecentSession?: number;
+  /** Service context that produced this project (aggregate/multi-backend views only) */
+  contextId?: string;
+  /** Data backend that produced this project (aggregate/multi-backend views only) */
+  sourceBackend?: DataBackendName;
+  /**
+   * Union of all backends this (possibly cross-backend-merged) project came
+   * from, ordered claude/kimi/codex. Set only in aggregate views; used for
+   * client-side source filtering where a merged card must match any of its
+   * sources. Single-source entries carry a one-element array.
+   */
+  sourceBackends?: DataBackendName[];
 }
 
 /**
@@ -111,6 +124,27 @@ export interface Session {
   compactionCount?: number;
   /** Per-phase token breakdown for tooltip display */
   phaseBreakdown?: PhaseTokenBreakdown[];
+  /** Service context that produced this session (aggregate/multi-backend views only) */
+  contextId?: string;
+  /** Data backend that produced this session (aggregate/multi-backend views only) */
+  sourceBackend?: DataBackendName;
+}
+
+/**
+ * Lightweight metadata extracted from a session file for listings.
+ */
+export interface SessionFileMetadata {
+  firstUserMessage: { text: string; timestamp: string } | null;
+  messageCount: number;
+  isOngoing: boolean;
+  gitBranch: string | null;
+  /** Total context consumed (compaction-aware) */
+  contextConsumption?: number;
+  /** Number of compaction events */
+  compactionCount?: number;
+  /** Per-phase token breakdown */
+  phaseBreakdown?: PhaseTokenBreakdown[];
+  hasDisplayableContent: boolean;
 }
 
 /**
@@ -133,6 +167,106 @@ export interface SessionMetrics {
   messageCount: number;
   /** Estimated cost in USD */
   costUsd?: number;
+}
+
+// =============================================================================
+// Cross-Session Aggregate Metrics Types
+// =============================================================================
+
+/**
+ * One day's worth of aggregate activity, keyed by UTC calendar date.
+ * Derived from cheap session-list data only (no per-session deep parse).
+ */
+export interface AggregateMetricsBucket {
+  /** UTC calendar date (YYYY-MM-DD) taken from session.createdAt */
+  date: string;
+  /** Sessions created on this day */
+  sessions: number;
+  /** Total message count of those sessions */
+  messages: number;
+  /** Total token volume (contextConsumption proxy) of those sessions */
+  tokens: number;
+}
+
+/** Per-backend rollup of session/message/token volume. */
+export interface AggregateBackendStat {
+  /** Origin data backend */
+  backend: DataBackendName;
+  /** Sessions produced by this backend */
+  sessions: number;
+  /** Total message count across those sessions */
+  messages: number;
+  /** Total token volume (contextConsumption proxy) across those sessions */
+  tokens: number;
+}
+
+/** Count of annotated sessions at a given star score (1-5). */
+export interface AggregateScoreStat {
+  /** Star score, 1-5 */
+  score: number;
+  /** Number of sessions rated at this score */
+  sessions: number;
+}
+
+/** Per-tag rollup of annotated sessions. */
+export interface AggregateTagStat {
+  /** Annotation tag */
+  tag: string;
+  /** Number of sessions carrying this tag */
+  sessions: number;
+}
+
+/** Per-project rollup of session/message/token volume. */
+export interface AggregateProjectStat {
+  /** Canonical (cross-backend) project id */
+  projectId: string;
+  /** Display name (last path segment) */
+  name: string;
+  /** Project filesystem path */
+  path: string;
+  /** Sessions belonging to this project */
+  sessions: number;
+  /** Total message count across those sessions */
+  messages: number;
+  /** Total token volume (contextConsumption proxy) across those sessions */
+  tokens: number;
+}
+
+/**
+ * Cross-session dashboard metrics aggregated across every local backend
+ * context. Built exclusively from cheap session-list data (session counts,
+ * message counts, and contextConsumption as a token proxy) — cost and precise
+ * latency are intentionally out of scope (per-session detail covers those).
+ */
+export interface AggregateMetrics {
+  /** Top-line totals across all contexts */
+  totals: { sessions: number; messages: number; tokens: number; projects: number };
+  /** One bucket per day that has sessions, sorted ascending by date */
+  daily: AggregateMetricsBucket[];
+  /** Per-backend rollup, sorted by sessions desc */
+  byBackend: AggregateBackendStat[];
+  /** Top 10 projects by sessions desc */
+  byProject: AggregateProjectStat[];
+  /**
+   * Session-annotation rollups (from local user scores/tags). Present so the
+   * dashboard can surface quality signals alongside volume. These join local
+   * annotations onto the aggregated sessions; sessions without an annotation
+   * are simply absent from these breakdowns.
+   */
+  annotations: {
+    /** Number of sessions that carry any annotation (tag, score, or note) */
+    annotatedSessions: number;
+    /** Number of sessions with a non-null star score */
+    scoredSessions: number;
+    /** Average star score across scored sessions (0 when none) */
+    avgScore: number;
+    /** Count of scored sessions per star value, ascending by score */
+    scoreDistribution: AggregateScoreStat[];
+    /** Per-tag session counts, sorted by sessions desc */
+    byTag: AggregateTagStat[];
+  };
+  /** Unix timestamp (ms) when these metrics were computed */
+  generatedAt: number;
 }
 
 // =============================================================================
@@ -191,6 +325,16 @@ export interface Worktree {
   createdAt: number;
   /** Unix timestamp of most recent session activity */
   mostRecentSession?: number;
+  /** Service context that produced this worktree (aggregate/multi-backend views only) */
+  contextId?: string;
+  /** Data backend that produced this worktree (aggregate/multi-backend views only) */
+  sourceBackend?: DataBackendName;
+  /**
+   * Union of all backends this (possibly cross-backend-merged) worktree came
+   * from, ordered claude/kimi/codex. Aggregate views only; single-source
+   * entries carry a one-element array.
+   */
+  sourceBackends?: DataBackendName[];
 }
 
 /**
@@ -211,6 +355,16 @@ export interface RepositoryGroup {
   mostRecentSession?: number;
   /** Total session count across all worktrees */
   totalSessions: number;
+  /** Service context that produced this group (aggregate/multi-backend views only) */
+  contextId?: string;
+  /** Data backend that produced this group (aggregate/multi-backend views only) */
+  sourceBackend?: DataBackendName;
+  /**
+   * Union of all backends this (possibly cross-backend-merged) group came from,
+   * ordered claude/kimi/codex. Aggregate views only; single-source entries
+   * carry a one-element array.
+   */
+  sourceBackends?: DataBackendName[];
 }
 
 // =============================================================================

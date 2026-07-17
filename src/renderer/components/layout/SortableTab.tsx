@@ -7,8 +7,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
-import { Bell, BookOpen, FileText, LayoutDashboard, Pin, Search, Settings, X } from 'lucide-react';
+import {
+  BarChart3,
+  Bell,
+  BookOpen,
+  Columns3,
+  FileText,
+  LayoutDashboard,
+  Pin,
+  Search,
+  Settings,
+  X,
+} from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import type { Tab } from '@renderer/types/tabs';
@@ -30,6 +42,8 @@ interface SortableTabProps {
 
 const TAB_ICONS = {
   dashboard: LayoutDashboard,
+  analytics: BarChart3,
+  comparison: Columns3,
   notifications: Bell,
   settings: Settings,
   session: FileText,
@@ -50,6 +64,7 @@ export const SortableTab = ({
   onClose,
   setRef,
 }: SortableTabProps): React.JSX.Element => {
+  const t = useT();
   const [isHovered, setIsHovered] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -146,12 +161,12 @@ export const SortableTab = ({
     >
       <Icon className="size-4 shrink-0" />
       {tab.fromSearch && (
-        <span title="Opened from search">
+        <span title={t('layout.openedFromSearch')}>
           <Search className="size-3 shrink-0 text-amber-400" />
         </span>
       )}
       {isPinned && (
-        <span title="Pinned session">
+        <span title={t('layout.pinnedSession')}>
           <Pin className="size-3 shrink-0 text-blue-400" />
         </span>
       )}
@@ -203,7 +218,7 @@ export const SortableTab = ({
           onClose(tab.id);
         }}
         onPointerDown={(e) => e.stopPropagation()}
-        title="Close tab"
+        title={t('layout.closeTabTooltip')}
       >
         <X className="size-3" />
       </button>

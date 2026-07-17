@@ -6,6 +6,7 @@ import {
   RepositoryDropdown,
   SelectedRepositoryItem,
 } from '@renderer/components/common/RepositoryDropdown';
+import { useT } from '@renderer/i18n';
 
 import { SettingRow, SettingsSectionHeader, SettingsSelect, SettingsToggle } from '../components';
 import { NotificationTriggerSettings } from '../NotificationTriggerSettings';
@@ -13,14 +14,14 @@ import { NotificationTriggerSettings } from '../NotificationTriggerSettings';
 import type { RepositoryDropdownItem, SafeConfig } from '../hooks/useSettingsConfig';
 import type { NotificationTrigger } from '@renderer/types/data';
 
-// Snooze duration options
+// Snooze duration options (labels resolved via i18n at render time)
 const SNOOZE_OPTIONS = [
-  { value: 15, label: '15 minutes' },
-  { value: 30, label: '30 minutes' },
-  { value: 60, label: '1 hour' },
-  { value: 120, label: '2 hours' },
-  { value: 240, label: '4 hours' },
-  { value: -1, label: 'Until tomorrow' },
+  { value: 15, labelKey: 'settings.notifications.snoozeMinutes', count: 15 },
+  { value: 30, labelKey: 'settings.notifications.snoozeMinutes', count: 30 },
+  { value: 60, labelKey: 'settings.notifications.snoozeHour' },
+  { value: 120, labelKey: 'settings.notifications.snoozeHours', count: 2 },
+  { value: 240, labelKey: 'settings.notifications.snoozeHours', count: 4 },
+  { value: -1, labelKey: 'settings.notifications.snoozeUntilTomorrow' },
 ] as const;
 
 interface NotificationsSectionProps {
@@ -60,6 +61,8 @@ export const NotificationsSection = ({
   onUpdateTrigger,
   onRemoveTrigger,
 }: NotificationsSectionProps): React.JSX.Element => {
+  const t = useT();
+
   return (
     <div>
       {/* Notification Triggers */}
@@ -72,10 +75,10 @@ export const NotificationsSection = ({
       />
 
       {/* Notification Settings */}
-      <SettingsSectionHeader title="Notification Settings" />
+      <SettingsSectionHeader title={t('settings.notifications.settings')} />
       <SettingRow
-        label="Enable System Notifications"
-        description="Show system notifications for errors and events"
+        label={t('settings.notifications.enableSystem')}
+        description={t('settings.notifications.enableSystemDesc')}
       >
         <SettingsToggle
           enabled={safeConfig.notifications.enabled}
@@ -83,7 +86,10 @@ export const NotificationsSection = ({
           disabled={saving}
         />
       </SettingRow>
-      <SettingRow label="Play sound" description="Play a sound when notifications appear">
+      <SettingRow
+        label={t('settings.notifications.playSound')}
+        description={t('settings.notifications.playSoundDesc')}
+      >
         <SettingsToggle
           enabled={safeConfig.notifications.soundEnabled}
           onChange={(v) => onNotificationToggle('soundEnabled', v)}
@@ -91,8 +97,8 @@ export const NotificationsSection = ({
         />
       </SettingRow>
       <SettingRow
-        label="Include subagent errors"
-        description="Detect and notify about errors in subagent sessions"
+        label={t('settings.notifications.includeSubagentErrors')}
+        description={t('settings.notifications.includeSubagentErrorsDesc')}
       >
         <SettingsToggle
           enabled={safeConfig.notifications.includeSubagentErrors}
@@ -101,11 +107,13 @@ export const NotificationsSection = ({
         />
       </SettingRow>
       <SettingRow
-        label="Snooze notifications"
+        label={t('settings.notifications.snooze')}
         description={
           isSnoozed
-            ? `Snoozed until ${new Date(safeConfig.notifications.snoozedUntil!).toLocaleTimeString()}`
-            : 'Temporarily pause notifications'
+            ? t('settings.notifications.snoozedUntil', {
+                time: new Date(safeConfig.notifications.snoozedUntil!).toLocaleTimeString(),
+              })
+            : t('settings.notifications.snoozeDesc')
         }
       >
         <div className="flex items-center gap-2">
@@ -115,12 +123,21 @@ export const NotificationsSection = ({
               disabled={saving}
               className={`rounded-md bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-400 transition-all duration-150 hover:bg-red-500/20 ${saving ? 'cursor-not-allowed opacity-50' : ''} `}
             >
-              Clear Snooze
+              {t('settings.notifications.clearSnooze')}
             </button>
           ) : (
             <SettingsSelect
               value={0}
-              options={[{ value: 0, label: 'Select duration...' }, ...SNOOZE_OPTIONS]}
+              options={[
+                { value: 0, label: t('settings.notifications.selectDuration') },
+                ...SNOOZE_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: t(
+                    option.labelKey,
+                    'count' in option ? { count: option.count } : undefined
+                  ),
+                })),
+              ]}
               onChange={(v) => v !== 0 && onSnooze(v)}
               disabled={saving || !safeConfig.notifications.enabled}
               dropUp
@@ -129,9 +146,9 @@ export const NotificationsSection = ({
         </div>
       </SettingRow>
 
-      <SettingsSectionHeader title="Ignored Repositories" />
+      <SettingsSectionHeader title={t('settings.notifications.ignoredRepositories')} />
       <p className="mb-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-        Notifications from these repositories will be ignored
+        {t('settings.notifications.ignoredRepositoriesDesc')}
       </p>
       {ignoredRepositoryItems.length > 0 ? (
         <div className="mb-3">
@@ -150,14 +167,14 @@ export const NotificationsSection = ({
           style={{ borderColor: 'var(--color-border)' }}
         >
           <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            No repositories ignored
+            {t('settings.notifications.noRepositoriesIgnored')}
           </p>
         </div>
       )}
       <RepositoryDropdown
         onSelect={onAddIgnoredRepository}
         excludeIds={excludedRepositoryIds}
-        placeholder="Select repository to ignore..."
+        placeholder={t('settings.notifications.selectRepositoryToIgnore')}
         disabled={saving}
         dropUp
       />

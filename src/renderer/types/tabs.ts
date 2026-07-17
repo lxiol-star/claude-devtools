@@ -7,6 +7,7 @@ import { generateUUID } from '@renderer/utils/stringUtils';
 
 import type { Session } from './data';
 import type { TriggerColor } from '@shared/constants/triggerColors';
+import type { DataBackendName } from '@shared/types/api';
 
 // =============================================================================
 // Navigation Request Types
@@ -71,6 +72,24 @@ export interface TabNavigationRequest {
 // =============================================================================
 
 /**
+ * Identity of a single session being compared (type === 'comparison').
+ * Carries the full origin (contextId in aggregate mode) so the compared
+ * sessions resolve against the correct backend, plus a display label.
+ */
+export interface ComparisonSession {
+  /** Origin service context in aggregate ("All") mode; undefined for single-source */
+  contextId?: string;
+  /** Project ID owning the session */
+  projectId: string;
+  /** Session ID */
+  sessionId: string;
+  /** Display label (truncated first message or the id) */
+  label: string;
+  /** Data backend that produced this session (for the badge) */
+  sourceBackend?: DataBackendName;
+}
+
+/**
  * Represents a single open tab in the main content area
  */
 export interface Tab {
@@ -78,10 +97,27 @@ export interface Tab {
   id: string;
 
   /** Type of content displayed in this tab */
-  type: 'session' | 'dashboard' | 'notifications' | 'settings' | 'memory';
+  type:
+    | 'session'
+    | 'dashboard'
+    | 'analytics'
+    | 'comparison'
+    | 'notifications'
+    | 'settings'
+    | 'memory';
 
   /** Session ID (required when type === 'session') */
   sessionId?: string;
+
+  /** Sessions being compared (required when type === 'comparison') */
+  comparisonSessions?: ComparisonSession[];
+
+  /**
+   * Origin service context of the session (aggregate "All" mode only).
+   * Part of the tab's session identity so the same session id from two
+   * backends doesn't collide; undefined for single-source tabs.
+   */
+  contextId?: string;
 
   /** Project ID (required when type === 'session', or when type === 'memory') */
   projectId?: string;

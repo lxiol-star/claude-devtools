@@ -7,6 +7,7 @@
 
 import { createLogger } from '@shared/utils/logger';
 
+import { registerAggregateRoutes } from './aggregate';
 import { registerConfigRoutes } from './config';
 import { registerEventRoutes } from './events';
 import { registerMemoryRoutes } from './memory';
@@ -25,6 +26,7 @@ import type {
   DataCache,
   MemoryReader,
   ProjectScanner,
+  ServiceContextRegistry,
   SessionParser,
   SubagentResolver,
   UpdaterService,
@@ -43,6 +45,11 @@ export interface HttpServices {
   memoryReader: MemoryReader;
   updaterService: UpdaterService;
   sshConnectionManager: SshConnectionManager;
+  /**
+   * Context registry for aggregate (cross-backend) routes. Optional: when
+   * absent, aggregate routes fall back to the single active-context services.
+   */
+  contextRegistry?: ServiceContextRegistry;
 }
 
 export function registerHttpRoutes(
@@ -52,6 +59,7 @@ export function registerHttpRoutes(
 ): void {
   registerProjectRoutes(app, services);
   registerSessionRoutes(app, services);
+  registerAggregateRoutes(app, services);
   registerSearchRoutes(app, services);
   registerSubagentRoutes(app, services);
   registerNotificationRoutes(app);

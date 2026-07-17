@@ -6,6 +6,8 @@
 
 import React from 'react';
 
+import { useT } from '@renderer/i18n';
+
 import { StatusDot } from '../BaseItem';
 
 import { renderOutput } from './renderHelpers';
@@ -17,6 +19,8 @@ interface ToolErrorDisplayProps {
 }
 
 export const ToolErrorDisplay: React.FC<ToolErrorDisplayProps> = ({ linkedTool }) => {
+  const t = useT();
+
   if (!linkedTool.result?.isError) return null;
 
   return (
@@ -25,7 +29,7 @@ export const ToolErrorDisplay: React.FC<ToolErrorDisplayProps> = ({ linkedTool }
         className="mb-1 flex items-center gap-2 text-xs"
         style={{ color: 'var(--tool-item-muted)' }}
       >
-        Error
+        {t('common.error')}
         <StatusDot status="error" />
       </div>
       <div

@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import {
   extractTextFromContent,
+  extractFixtures,
   exportAsPlainText,
   exportAsMarkdown,
   exportAsJson,
@@ -712,5 +713,63 @@ describe('edge cases', () => {
     expect(result).toContain('Tool: Read');
     expect(result).toContain('Result text');
     expect(result).toContain('file data');
+  });
+});
+
+describe('extractFixtures', () => {
+  it('emits one fixture per tool execution, paired with the preceding prompt', () => {
+    const userChunk = makeUserChunk({
+      userMessage: makeMessage({ content: 'Read the config file' }),
+    });
+    const aiChunk = makeAIChunk({
+      toolExecutions: [
+        {
+          toolCall: { id: 't1', name: 'Read', input: { file_path: '/a/config.json' } },
+          result: { content: '{"key":"value"}', isError: false },
+          startTime: new Date('2025-01-15T10:00:02Z'),
+        },
+      ],
+    });
+    const detail = makeSessionDetail({ chunks: [userChunk, aiChunk] });
+
+    const fixtures = extractFixtures(detail as never);
+
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0]).toEqual({
+      prompt: 'Read the config file',
+      toolName: 'Read',
+      input: { file_path: '/a/config.json' },
+      output: '{"key":"value"}',
+      isError: false,
+    });
+  });
+
+  it('carries error flag and handles missing results', () => {
+    const aiChunk = makeAIChunk({
+      toolExecutions: [
+        {
+          toolCall: { id: 't1', name: 'Bash', input: { command: 'ls' } },
+          result: { content: 'boom', isError: true },
+          startTime: new Date('2025-01-15T10:00:02Z'),
+        },
+        {
+          toolCall: { id: 't2', name: 'Grep', input: { pattern: 'x' } },
+          startTime: new Date('2025-01-15T10:00:03Z'),
+        },
+      ],
+    });
+    const detail = makeSessionDetail({ chunks: [makeUserChunk(), aiChunk] });
+
+    const fixtures = extractFixtures(detail as never);
+
+    expect(fixtures).toHaveLength(2);
+    expect(fixtures[0].isError).toBe(true);
+    expect(fixtures[1].output).toBe('');
+    expect(fixtures[1].isError).toBe(false);
+  });
+
+  it('returns an empty array when there are no tool executions', () => {
+    const detail = makeSessionDetail();
+    expect(extractFixtures(detail as never)).toEqual([]);
   });
 });

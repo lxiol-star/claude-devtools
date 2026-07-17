@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 
 import { isElectronMode } from '@renderer/api';
 import faviconUrl from '@renderer/favicon.png';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { Minus, Square, X } from 'lucide-react';
 
@@ -21,6 +22,7 @@ function needsCustomTitleBar(): boolean {
 }
 
 export const CustomTitleBar = (): React.JSX.Element | null => {
+  const t = useT();
   const [isMaximized, setIsMaximized] = useState(false);
   const useNativeTitleBar = useStore((s) => s.appConfig?.general?.useNativeTitleBar ?? false);
   const showTitleBar = needsCustomTitleBar() && !useNativeTitleBar;
@@ -65,8 +67,8 @@ export const CustomTitleBar = (): React.JSX.Element | null => {
           className={`${buttonBase} ${buttonHover}`}
           style={{ color: 'var(--color-text-secondary)' }}
           onClick={() => void minimize()}
-          title="Minimize"
-          aria-label="Minimize"
+          title={t('layout.minimize')}
+          aria-label={t('layout.minimize')}
         >
           <Minus className="size-4" strokeWidth={2.5} />
         </button>
@@ -75,8 +77,8 @@ export const CustomTitleBar = (): React.JSX.Element | null => {
           className={`${buttonBase} ${buttonHover}`}
           style={{ color: 'var(--color-text-secondary)' }}
           onClick={() => void handleMaximize()}
-          title={isMaximized ? 'Restore' : 'Maximize'}
-          aria-label={isMaximized ? 'Restore' : 'Maximize'}
+          title={isMaximized ? t('layout.restore') : t('layout.maximize')}
+          aria-label={isMaximized ? t('layout.restore') : t('layout.maximize')}
         >
           <Square className="size-3.5" strokeWidth={2.5} />
         </button>
@@ -85,8 +87,8 @@ export const CustomTitleBar = (): React.JSX.Element | null => {
           className={`${buttonBase} hover:bg-red-500/90 hover:text-white`}
           style={{ color: 'var(--color-text-secondary)' }}
           onClick={() => void close()}
-          title="Close"
-          aria-label="Close"
+          title={t('common.close')}
+          aria-label={t('common.close')}
         >
           <X className="size-4" strokeWidth={2.5} />
         </button>

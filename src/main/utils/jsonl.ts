@@ -22,6 +22,7 @@ import {
   isTextContent,
   type MessageType,
   type ParsedMessage,
+  type SessionFileMetadata,
   type SessionMetrics,
   type TokenUsage,
   type ToolCall,
@@ -337,20 +338,6 @@ export function extractTextContent(message: ParsedMessage): string {
  */
 export function getTaskCalls(messages: ParsedMessage[]): ToolCall[] {
   return messages.flatMap((m) => m.toolCalls.filter((tc) => tc.isTask));
-}
-
-export interface SessionFileMetadata {
-  firstUserMessage: { text: string; timestamp: string } | null;
-  messageCount: number;
-  isOngoing: boolean;
-  gitBranch: string | null;
-  /** Total context consumed (compaction-aware) */
-  contextConsumption?: number;
-  /** Number of compaction events */
-  compactionCount?: number;
-  /** Per-phase token breakdown */
-  phaseBreakdown?: PhaseTokenBreakdown[];
-  hasDisplayableContent: boolean;
 }
 
 /**

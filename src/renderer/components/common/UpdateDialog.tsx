@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 import { markdownComponents } from '@renderer/components/chat/markdownComponents';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { X } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
@@ -39,6 +40,7 @@ function normalizeReleaseNotes(html: string): string {
 }
 
 export const UpdateDialog = (): React.JSX.Element | null => {
+  const t = useT();
   const showUpdateDialog = useStore((s) => s.showUpdateDialog);
   const availableVersion = useStore((s) => s.availableVersion);
   const releaseNotes = useStore((s) => s.releaseNotes);
@@ -106,7 +108,7 @@ export const UpdateDialog = (): React.JSX.Element | null => {
         className="absolute inset-0 cursor-default"
         style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
         onClick={dismissUpdateDialog}
-        aria-label="Close dialog"
+        aria-label={t('layout.closeDialog')}
         tabIndex={-1}
       />
       <div
@@ -114,7 +116,7 @@ export const UpdateDialog = (): React.JSX.Element | null => {
         className="relative mx-4 w-full max-w-sm rounded-md border p-4 shadow-lg"
         role="dialog"
         aria-modal="true"
-        aria-label="Update available"
+        aria-label={t('layout.updateAvailableAria')}
         style={{
           backgroundColor: 'var(--color-surface-overlay)',
           borderColor: 'var(--color-border-emphasis)',
@@ -131,7 +133,7 @@ export const UpdateDialog = (): React.JSX.Element | null => {
 
         <div className="mb-3 pr-8">
           <h2 className="text-base font-semibold" style={{ color: 'var(--color-text)' }}>
-            Update Available
+            {t('layout.updateAvailable')}
           </h2>
           {availableVersion && (
             <div className="mt-1 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
@@ -166,13 +168,13 @@ export const UpdateDialog = (): React.JSX.Element | null => {
               color: 'var(--color-text-secondary)',
             }}
           >
-            Later
+            {t('layout.later')}
           </button>
           <button
             onClick={downloadUpdate}
             className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-500"
           >
-            Download
+            {t('layout.download')}
           </button>
         </div>
       </div>

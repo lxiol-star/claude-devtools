@@ -30,6 +30,8 @@ export interface ConnectionSlice {
   connectionError: string | null;
   sshConfigHosts: SshConfigHostEntry[];
   lastSshConfig: SshLastConnection | null;
+  /** Backend of the active local data root (which agent produced the sessions) */
+  dataBackend: 'claude' | 'kimi' | 'codex';
 
   // Actions
   connectSsh: (config: SshConnectionConfig) => Promise<void>;
@@ -43,6 +45,7 @@ export interface ConnectionSlice {
   fetchSshConfigHosts: () => Promise<void>;
   resolveConfigHost: (alias: string) => Promise<SshConfigHostEntry | null>;
   loadLastConnection: () => Promise<void>;
+  fetchDataBackend: () => Promise<void>;
 }
 
 // =============================================================================
@@ -60,6 +63,7 @@ export const createConnectionSlice: StateCreator<AppState, [], [], ConnectionSli
   connectionError: null,
   sshConfigHosts: [],
   lastSshConfig: null,
+  dataBackend: 'claude',
 
   // Actions
   connectSsh: async (config: SshConnectionConfig): Promise<void> => {
@@ -104,6 +108,9 @@ export const createConnectionSlice: StateCreator<AppState, [], [], ConnectionSli
 
       // Re-fetch all data and persist config when connected
       if (status.state === 'connected') {
+        // Remote backend detection is not available; assume the common Claude layout.
+        set({ dataBackend: 'claude' });
+
         const state = get();
         void state.fetchProjects();
         void state.fetchRepositoryGroups();
@@ -161,6 +168,7 @@ export const createConnectionSlice: StateCreator<AppState, [], [], ConnectionSli
       const state = get();
       void state.fetchProjects();
       void state.fetchRepositoryGroups();
+      void state.fetchDataBackend();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ connectionError: message });
@@ -215,6 +223,17 @@ export const createConnectionSlice: StateCreator<AppState, [], [], ConnectionSli
       set({ lastSshConfig: saved });
     } catch {
       // Gracefully ignore - no saved connection
+    }
+  },
+
+  fetchDataBackend: async (): Promise<void> => {
+    try {
+      const info = await api.config.getClaudeRootInfo();
+      if (info.backend) {
+        set({ dataBackend: info.backend });
+      }
+    } catch {
+      // Gracefully ignore - keep current backend label
     }
   },
 });

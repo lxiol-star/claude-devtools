@@ -7,7 +7,7 @@ import { create } from 'zustand';
 
 import { createConfigSlice } from './slices/configSlice';
 import { createConnectionSlice } from './slices/connectionSlice';
-import { createContextSlice } from './slices/contextSlice';
+import { createContextSlice, isAggregateSourceMode } from './slices/contextSlice';
 import { createConversationSlice } from './slices/conversationSlice';
 import { createMemorySlice } from './slices/memorySlice';
 import { createNotificationSlice } from './slices/notificationSlice';
@@ -24,7 +24,7 @@ import { createUpdateSlice } from './slices/updateSlice';
 
 import type { DetectedError } from '../types/data';
 import type { AppState } from './types';
-import type { UpdaterStatus } from '@shared/types';
+import type { FileChangeEvent, UpdaterStatus } from '@shared/types';
 
 // =============================================================================
 // Store Creation
@@ -232,62 +232,85 @@ export function initializeNotificationListeners(): () => void {
     }
   }
 
+  // Shared handler for file-change events: refreshes the sidebar session list
+  // and keeps opened session views in sync. Used for both the active context's
+  // events (onFileChange) and tagged events from inactive local backends
+  // (onContextFileChange, aggregate "All" mode only).
+  const handleFileChangeEvent = (event: FileChangeEvent): void => {
+    // Skip unlink events
+    if (event.type === 'unlink') {
+      return;
+    }
+
+    const state = useStore.getState();
+    const selectedProjectId = state.selectedProjectId;
+    const selectedProjectBaseId = getBaseProjectId(selectedProjectId);
+    const eventProjectBaseId = getBaseProjectId(event.projectId);
+    const matchesSelectedProject =
+      !!selectedProjectId &&
+      (eventProjectBaseId == null || selectedProjectBaseId === eventProjectBaseId);
+    const isTopLevelSessionEvent = !event.isSubagent;
+    const isUnknownSessionInSidebar =
+      event.sessionId == null ||
+      !state.sessions.some((session) => session.id === event.sessionId);
+    const shouldRefreshSidebar =
+      isTopLevelSessionEvent &&
+      matchesSelectedProject &&
+      (isUnknownSessionInSidebar || event.type === 'change' || event.type === 'add');
+
+    // Refresh sidebar session list when a new session appears or an existing session updates.
+    if (shouldRefreshSidebar) {
+      if (matchesSelectedProject && selectedProjectId) {
+        scheduleProjectRefresh(selectedProjectId);
+      }
+    }
+
+    // Keep opened session view in sync on content changes.
+    // Some local writers emit rename/add for in-place updates, so include "add".
+    if ((event.type === 'change' || event.type === 'add') && selectedProjectId) {
+      const activeSessionId = state.selectedSessionId;
+      const eventSessionId = event.sessionId;
+      const isViewingEventSession =
+        !!eventSessionId &&
+        (activeSessionId === eventSessionId || isSessionVisibleInAnyPane(eventSessionId));
+      const shouldFallbackRefreshActiveSession =
+        matchesSelectedProject && !eventSessionId && !!activeSessionId;
+      const sessionIdToRefresh =
+        (isViewingEventSession ? eventSessionId : null) ??
+        (shouldFallbackRefreshActiveSession ? activeSessionId : null);
+
+      if (sessionIdToRefresh) {
+        const allTabs = state.getAllPaneTabs();
+        const visibleSessionTab = allTabs.find(
+          (tab) => tab.type === 'session' && tab.sessionId === sessionIdToRefresh
+        );
+        const refreshProjectId = visibleSessionTab?.projectId ?? selectedProjectId;
+
+        // Use refreshSessionInPlace to avoid flickering and preserve UI state.
+        // It resolves the viewed session's origin context internally, so
+        // events from inactive backends (aggregate mode) work unchanged.
+        scheduleSessionRefresh(refreshProjectId, sessionIdToRefresh);
+      }
+    }
+  };
+
   // Listen for file changes to auto-refresh current session and detect new sessions
   if (api.onFileChange) {
-    const cleanup = api.onFileChange((event) => {
-      // Skip unlink events
-      if (event.type === 'unlink') {
+    const cleanup = api.onFileChange(handleFileChangeEvent);
+    if (typeof cleanup === 'function') {
+      cleanupFns.push(cleanup);
+    }
+  }
+
+  // Listen for context-tagged file changes from inactive local backends.
+  // Only the aggregate "All" view consumes them — single-source mode reacts
+  // to the active context's events via onFileChange above.
+  if (api.onContextFileChange) {
+    const cleanup = api.onContextFileChange(({ event }) => {
+      if (!isAggregateSourceMode(useStore.getState())) {
         return;
       }
-
-      const state = useStore.getState();
-      const selectedProjectId = state.selectedProjectId;
-      const selectedProjectBaseId = getBaseProjectId(selectedProjectId);
-      const eventProjectBaseId = getBaseProjectId(event.projectId);
-      const matchesSelectedProject =
-        !!selectedProjectId &&
-        (eventProjectBaseId == null || selectedProjectBaseId === eventProjectBaseId);
-      const isTopLevelSessionEvent = !event.isSubagent;
-      const isUnknownSessionInSidebar =
-        event.sessionId == null ||
-        !state.sessions.some((session) => session.id === event.sessionId);
-      const shouldRefreshSidebar =
-        isTopLevelSessionEvent &&
-        matchesSelectedProject &&
-        (isUnknownSessionInSidebar || event.type === 'change' || event.type === 'add');
-
-      // Refresh sidebar session list when a new session appears or an existing session updates.
-      if (shouldRefreshSidebar) {
-        if (matchesSelectedProject && selectedProjectId) {
-          scheduleProjectRefresh(selectedProjectId);
-        }
-      }
-
-      // Keep opened session view in sync on content changes.
-      // Some local writers emit rename/add for in-place updates, so include "add".
-      if ((event.type === 'change' || event.type === 'add') && selectedProjectId) {
-        const activeSessionId = state.selectedSessionId;
-        const eventSessionId = event.sessionId;
-        const isViewingEventSession =
-          !!eventSessionId &&
-          (activeSessionId === eventSessionId || isSessionVisibleInAnyPane(eventSessionId));
-        const shouldFallbackRefreshActiveSession =
-          matchesSelectedProject && !eventSessionId && !!activeSessionId;
-        const sessionIdToRefresh =
-          (isViewingEventSession ? eventSessionId : null) ??
-          (shouldFallbackRefreshActiveSession ? activeSessionId : null);
-
-        if (sessionIdToRefresh) {
-          const allTabs = state.getAllPaneTabs();
-          const visibleSessionTab = allTabs.find(
-            (tab) => tab.type === 'session' && tab.sessionId === sessionIdToRefresh
-          );
-          const refreshProjectId = visibleSessionTab?.projectId ?? selectedProjectId;
-
-          // Use refreshSessionInPlace to avoid flickering and preserve UI state
-          scheduleSessionRefresh(refreshProjectId, sessionIdToRefresh);
-        }
-      }
+      handleFileChangeEvent(event);
     });
     if (typeof cleanup === 'function') {
       cleanupFns.push(cleanup);

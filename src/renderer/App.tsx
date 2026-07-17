@@ -24,6 +24,7 @@ export const App = (): React.JSX.Element => {
   // Initialize context system (before notification listeners)
   useEffect(() => {
     void useStore.getState().initializeContextSystem();
+    void useStore.getState().fetchDataBackend();
   }, []);
 
   // Refresh available contexts when SSH connection state changes

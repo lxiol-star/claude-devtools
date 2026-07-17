@@ -4,6 +4,8 @@
 
 import React from 'react';
 
+import { useT } from '@renderer/i18n';
+
 import { formatTokens } from '../utils/formatting';
 
 import type { ToolTokenBreakdown } from '@renderer/types/contextInjection';
@@ -15,6 +17,8 @@ interface ToolBreakdownItemProps {
 export const ToolBreakdownItem = ({
   tool,
 }: Readonly<ToolBreakdownItemProps>): React.ReactElement => {
+  const t = useT();
+
   return (
     <div className="flex items-center gap-2 py-0.5 text-xs">
       <span style={{ color: 'var(--color-text-muted)' }}>{tool.toolName}</span>
@@ -30,7 +34,7 @@ export const ToolBreakdownItem = ({
             fontSize: '10px',
           }}
         >
-          error
+          {t('chat.errorBadge')}
         </span>
       )}
     </div>

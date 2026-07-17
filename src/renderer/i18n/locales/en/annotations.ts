@@ -1,0 +1,21 @@
+/** English strings for session annotations (tags + score + note). */
+export const annotations: Record<string, string> = {
+  'annotations.rate': 'Rate',
+  'annotations.clearRating': 'Clear rating',
+  'annotations.tags': 'Tags',
+  'annotations.addTag': 'Add tag',
+  'annotations.removeTag': 'Remove tag "{tag}"',
+  'annotations.addTagPrompt': 'Enter a tag name',
+  'annotations.note': 'Note',
+  'annotations.editNote': 'Edit note',
+  'annotations.editNotePrompt': 'Enter a note for this session',
+  'annotations.noNote': 'No note',
+  'annotations.filterLabel': 'Filter',
+  'annotations.filterTitle': 'Filter sessions by tags and rating',
+  'annotations.filterClear': 'Clear filter',
+  'annotations.filterMinScore': 'At least {score} star(s)',
+  'annotations.savedViews': 'Saved views',
+  'annotations.saveCurrentView': 'Save current',
+  'annotations.saveViewPrompt': 'Name this saved view',
+  'annotations.deleteView': 'Delete view "{name}"',
+};

@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 
 import { COLOR_TEXT_MUTED, COLOR_TEXT_SECONDARY } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { Brain, ChevronRight } from 'lucide-react';
 
 import { formatTokens } from '../utils/formatting';
@@ -20,6 +21,7 @@ export const ThinkingTextItem = ({
   injection,
   onNavigateToTurn,
 }: Readonly<ThinkingTextItemProps>): React.ReactElement => {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const turnIndex = injection.turnIndex;
   const isClickable = onNavigateToTurn && turnIndex >= 0;
@@ -65,15 +67,15 @@ export const ThinkingTextItem = ({
               }
             }}
           >
-            @Turn {turnIndex + 1}
+            @{t('chat.turn', { turn: turnIndex + 1 })}
           </span>
         ) : (
           <span className="text-xs" style={{ color: COLOR_TEXT_SECONDARY }}>
-            @Turn {turnIndex + 1}
+            @{t('chat.turn', { turn: turnIndex + 1 })}
           </span>
         )}
         <span className="text-xs" style={{ color: COLOR_TEXT_MUTED }}>
-          ~{formatTokens(injection.estimatedTokens)} tokens
+          {t('chat.tokens', { count: formatTokens(injection.estimatedTokens) })}
         </span>
       </button>
 
@@ -82,7 +84,7 @@ export const ThinkingTextItem = ({
           {injection.breakdown.map((item, idx) => (
             <div key={`${item.type}-${idx}`} className="flex items-center gap-2 py-0.5 text-xs">
               <span style={{ color: COLOR_TEXT_MUTED }}>
-                {item.type === 'thinking' ? 'Thinking' : 'Text'}
+                {item.type === 'thinking' ? t('chat.thinking') : t('chat.text')}
               </span>
               <span style={{ color: COLOR_TEXT_MUTED, opacity: 0.7 }}>
                 ~{formatTokens(item.tokenCount)}

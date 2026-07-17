@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { Loader2 } from 'lucide-react';
 
@@ -19,6 +20,7 @@ import {
 import { type SettingsSection, SettingsTabs } from './SettingsTabs';
 
 export const SettingsView = (): React.JSX.Element | null => {
+  const t = useT();
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
   const pendingSettingsSection = useStore((s) => s.pendingSettingsSection);
   const clearPendingSettingsSection = useStore((s) => s.clearPendingSettingsSection);
@@ -67,7 +69,7 @@ export const SettingsView = (): React.JSX.Element | null => {
       >
         <div className="flex items-center gap-3" style={{ color: 'var(--color-text-muted)' }}>
           <Loader2 className="size-5 animate-spin" />
-          <span>Loading settings...</span>
+          <span>{t('settings.loading')}</span>
         </div>
       </div>
     );
@@ -90,9 +92,8 @@ export const SettingsView = (): React.JSX.Element | null => {
               color: 'var(--color-text-secondary)',
             }}
           >
-            Retry
-          </button>
-        </div>
+            {t('common.retry')}
+          </button>        </div>
       </div>
     );
   }
@@ -105,10 +106,10 @@ export const SettingsView = (): React.JSX.Element | null => {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-lg font-medium" style={{ color: 'var(--color-text)' }}>
-            Settings
+            {t('settings.title')}
           </h1>
           <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Manage your app preferences
+            {t('settings.subtitle')}
           </p>
           {error && (
             <div className="mt-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2">

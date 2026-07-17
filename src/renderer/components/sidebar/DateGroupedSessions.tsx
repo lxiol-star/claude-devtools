@@ -7,17 +7,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import {
   getNonEmptyCategories,
   groupSessionsByDate,
   separatePinnedSessions,
 } from '@renderer/utils/dateGrouping';
+import { sessionMatchesAnnotation, sessionMatchesSource } from '@renderer/utils/sourceFilter';
+import { buildAnnotationKey } from '@shared/utils/annotationKey';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   ArrowDownWideNarrow,
   Calendar,
   CheckSquare,
+  Columns3,
   Eye,
   EyeOff,
   Loader2,
@@ -50,7 +54,16 @@ const SESSION_HEIGHT = 48; // Must match h-[48px] in SessionItem.tsx
 const LOADER_HEIGHT = 36;
 const OVERSCAN = 5;
 
+// DateCategory values come from utils/dateGrouping (asserted in unit tests); translate at render time
+const DATE_CATEGORY_LABEL_KEYS: Record<DateCategory, string> = {
+  Today: 'sidebar.dateCategory.today',
+  Yesterday: 'sidebar.dateCategory.yesterday',
+  'Previous 7 Days': 'sidebar.dateCategory.previous7Days',
+  Older: 'sidebar.dateCategory.older',
+};
+
 export const DateGroupedSessions = (): React.JSX.Element => {
+  const t = useT();
   const {
     sessions,
     selectedSessionId,
@@ -74,6 +87,11 @@ export const DateGroupedSessions = (): React.JSX.Element => {
     hideMultipleSessions,
     unhideMultipleSessions,
     pinMultipleSessions,
+    openComparison,
+    sourceFilter,
+    sessionAnnotations,
+    annotationFilterTags,
+    annotationMinScore,
   } = useStore(
     useShallow((s) => ({
       sessions: s.sessions,
@@ -98,6 +116,11 @@ export const DateGroupedSessions = (): React.JSX.Element => {
       hideMultipleSessions: s.hideMultipleSessions,
       unhideMultipleSessions: s.unhideMultipleSessions,
       pinMultipleSessions: s.pinMultipleSessions,
+      openComparison: s.openComparison,
+      sourceFilter: s.sourceFilter,
+      sessionAnnotations: s.sessionAnnotations,
+      annotationFilterTags: s.annotationFilterTags,
+      annotationMinScore: s.annotationMinScore,
     }))
   );
 
@@ -108,11 +131,25 @@ export const DateGroupedSessions = (): React.JSX.Element => {
   const hiddenSet = useMemo(() => new Set(hiddenSessionIds), [hiddenSessionIds]);
   const hasHiddenSessions = hiddenSessionIds.length > 0;
 
-  // Filter out hidden sessions unless showHiddenSessions is on
+  // Filter out hidden sessions (unless toggled on), apply the active source
+  // chip (aggregate mode holds sessions from every backend), and apply the
+  // annotation filter (tags + min score). All client-side, no refetch.
   const visibleSessions = useMemo(() => {
-    if (showHiddenSessions) return sessions;
-    return sessions.filter((s) => !hiddenSet.has(s.id));
-  }, [sessions, hiddenSet, showHiddenSessions]);
+    return sessions.filter((s) => {
+      if (!(showHiddenSessions || !hiddenSet.has(s.id))) return false;
+      if (!sessionMatchesSource(s, sourceFilter)) return false;
+      const annotation = sessionAnnotations[buildAnnotationKey(s.contextId, s.projectId, s.id)];
+      return sessionMatchesAnnotation(annotation, annotationFilterTags, annotationMinScore);
+    });
+  }, [
+    sessions,
+    hiddenSet,
+    showHiddenSessions,
+    sourceFilter,
+    sessionAnnotations,
+    annotationFilterTags,
+    annotationMinScore,
+  ]);
 
   // Separate pinned sessions from unpinned
   const { pinned: pinnedSessions, unpinned: unpinnedSessions } = useMemo(
@@ -295,11 +332,32 @@ export const DateGroupedSessions = (): React.JSX.Element => {
     clearSidebarSelection();
   }, [pinMultipleSessions, sidebarSelectedSessionIds, clearSidebarSelection]);
 
+  // Comparison requires 2-3 sessions; open a comparison tab from the selection.
+  const canCompare =
+    sidebarSelectedSessionIds.length >= 2 && sidebarSelectedSessionIds.length <= 3;
+
+  const handleBulkCompare = useCallback(() => {
+    if (!canCompare) return;
+    const compareList = sidebarSelectedSessionIds
+      .map((id) => sessions.find((s) => s.id === id))
+      .filter((s): s is Session => s != null)
+      .map((s) => ({
+        contextId: s.contextId,
+        projectId: s.projectId,
+        sessionId: s.id,
+        label: s.firstMessage?.trim() ? s.firstMessage.trim() : s.id,
+        sourceBackend: s.sourceBackend,
+      }));
+    if (compareList.length < 2) return;
+    openComparison(compareList);
+    clearSidebarSelection();
+  }, [canCompare, sidebarSelectedSessionIds, sessions, openComparison, clearSidebarSelection]);
+
   if (!selectedProjectId) {
     return (
       <div className="p-4">
         <div className="py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
-          <p>Select a project to view sessions</p>
+          <p>{t('sidebar.selectProjectPrompt')}</p>
         </div>
       </div>
     );
@@ -348,7 +406,7 @@ export const DateGroupedSessions = (): React.JSX.Element => {
           }}
         >
           <p className="mb-1 font-semibold" style={{ color: 'var(--color-text)' }}>
-            Error loading sessions
+            {t('sidebar.loadError')}
           </p>
           <p>{sessionsError}</p>
         </div>
@@ -361,8 +419,8 @@ export const DateGroupedSessions = (): React.JSX.Element => {
       <div className="p-4">
         <div className="py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
           <MessageSquareOff className="mx-auto mb-2 size-8 opacity-50" />
-          <p className="mb-2">No sessions found</p>
-          <p className="text-xs opacity-70">This project has no sessions yet</p>
+          <p className="mb-2">{t('sidebar.noSessions')}</p>
+          <p className="text-xs opacity-70">{t('sidebar.noSessionsHint')}</p>
         </div>
       </div>
     );
@@ -376,7 +434,7 @@ export const DateGroupedSessions = (): React.JSX.Element => {
           className="text-xs uppercase tracking-wider"
           style={{ color: 'var(--color-text-muted)' }}
         >
-          {sessionSortMode === 'most-context' ? 'By Context' : 'Sessions'}
+          {sessionSortMode === 'most-context' ? t('sidebar.byContext') : t('sidebar.sessions')}
         </h2>
         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- tooltip trigger via hover, not interactive */}
         <span
@@ -406,8 +464,7 @@ export const DateGroupedSessions = (): React.JSX.Element => {
                 color: 'var(--color-text-secondary)',
               }}
             >
-              {sessions.length} loaded so far — scroll down to load more. Context sorting only ranks
-              loaded sessions.
+              {t('sidebar.loadedSoFar', { count: sessions.length })}
             </div>,
             document.body
           )}
@@ -416,7 +473,7 @@ export const DateGroupedSessions = (): React.JSX.Element => {
           <button
             onClick={toggleSidebarMultiSelect}
             className="rounded p-1 transition-colors hover:bg-white/5"
-            title={sidebarMultiSelectActive ? 'Exit selection mode' : 'Select sessions'}
+            title={sidebarMultiSelectActive ? t('sidebar.exitSelectionMode') : t('sidebar.selectSessions')}
             style={{
               color: sidebarMultiSelectActive ? '#818cf8' : 'var(--color-text-muted)',
             }}
@@ -428,7 +485,7 @@ export const DateGroupedSessions = (): React.JSX.Element => {
             <button
               onClick={toggleShowHiddenSessions}
               className="rounded p-1 transition-colors hover:bg-white/5"
-              title={showHiddenSessions ? 'Hide hidden sessions' : 'Show hidden sessions'}
+              title={showHiddenSessions ? t('sidebar.hideHiddenSessions') : t('sidebar.showHiddenSessions')}
               style={{
                 color: showHiddenSessions ? '#818cf8' : 'var(--color-text-muted)',
               }}
@@ -442,7 +499,7 @@ export const DateGroupedSessions = (): React.JSX.Element => {
               setSessionSortMode(sessionSortMode === 'recent' ? 'most-context' : 'recent')
             }
             className="rounded p-1 transition-colors hover:bg-white/5"
-            title={sessionSortMode === 'recent' ? 'Sort by context consumption' : 'Sort by recent'}
+            title={sessionSortMode === 'recent' ? t('sidebar.sortByContext') : t('sidebar.sortByRecent')}
             style={{
               color: sessionSortMode === 'most-context' ? '#818cf8' : 'var(--color-text-muted)',
             }}
@@ -465,40 +522,49 @@ export const DateGroupedSessions = (): React.JSX.Element => {
             className="text-[11px] font-medium"
             style={{ color: 'var(--color-text-secondary)' }}
           >
-            {sidebarSelectedSessionIds.length} selected
+            {t('sidebar.selectedCount', { count: sidebarSelectedSessionIds.length })}
           </span>
           <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={handleBulkCompare}
+              disabled={!canCompare}
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ color: 'var(--color-text-secondary)' }}
+              title={t('sidebar.compareSelected')}
+            >
+              <Columns3 className="inline-block size-3" /> {t('sidebar.compare')}
+            </button>
             <button
               onClick={handleBulkPin}
               className="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-white/5"
               style={{ color: 'var(--color-text-secondary)' }}
-              title="Pin selected sessions"
+              title={t('sidebar.pinSelected')}
             >
-              <Pin className="inline-block size-3" /> Pin
+              <Pin className="inline-block size-3" /> {t('sidebar.pin')}
             </button>
             <button
               onClick={handleBulkHide}
               className="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-white/5"
               style={{ color: 'var(--color-text-secondary)' }}
-              title="Hide selected sessions"
+              title={t('sidebar.hideSelected')}
             >
-              <EyeOff className="inline-block size-3" /> Hide
+              <EyeOff className="inline-block size-3" /> {t('sidebar.hide')}
             </button>
             {showHiddenSessions && someSelectedAreHidden && (
               <button
                 onClick={handleBulkUnhide}
                 className="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-white/5"
                 style={{ color: 'var(--color-text-secondary)' }}
-                title="Unhide selected sessions"
+                title={t('sidebar.unhideSelected')}
               >
-                <Eye className="inline-block size-3" /> Unhide
+                <Eye className="inline-block size-3" /> {t('sidebar.unhide')}
               </button>
             )}
             <button
               onClick={clearSidebarSelection}
               className="rounded p-0.5 transition-colors hover:bg-white/5"
               style={{ color: 'var(--color-text-muted)' }}
-              title="Cancel selection"
+              title={t('sidebar.cancelSelection')}
             >
               <X className="size-3.5" />
             </button>
@@ -541,7 +607,7 @@ export const DateGroupedSessions = (): React.JSX.Element => {
                     }}
                   >
                     <Pin className="size-3" />
-                    Pinned
+                    {t('sidebar.pinned')}
                   </div>
                 ) : item.type === 'header' ? (
                   <div
@@ -553,7 +619,7 @@ export const DateGroupedSessions = (): React.JSX.Element => {
                       borderColor: 'var(--color-border-emphasis)',
                     }}
                   >
-                    {item.category}
+                    {t(DATE_CATEGORY_LABEL_KEYS[item.category])}
                   </div>
                 ) : item.type === 'loader' ? (
                   <div
@@ -563,10 +629,10 @@ export const DateGroupedSessions = (): React.JSX.Element => {
                     {sessionsLoadingMore ? (
                       <>
                         <Loader2 className="mr-2 size-4 animate-spin" />
-                        <span className="text-xs">Loading more sessions...</span>
+                        <span className="text-xs">{t('sidebar.loadingMore')}</span>
                       </>
                     ) : (
-                      <span className="text-xs opacity-50">Scroll to load more</span>
+                      <span className="text-xs opacity-50">{t('sidebar.scrollToLoadMore')}</span>
                     )}
                   </div>
                 ) : (

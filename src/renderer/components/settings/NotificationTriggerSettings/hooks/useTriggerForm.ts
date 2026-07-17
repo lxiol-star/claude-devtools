@@ -5,6 +5,7 @@
 import { useCallback, useState } from 'react';
 
 import { api } from '@renderer/api';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { createLogger } from '@shared/utils/logger';
 
@@ -58,6 +59,7 @@ interface UseTriggerFormReturn {
  * Shared form state and validation logic for trigger forms.
  */
 export function useTriggerForm(_options: UseTriggerFormOptions = {}): UseTriggerFormReturn {
+  const t = useT();
   const [patternError, setPatternError] = useState<string | null>(null);
   const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
 
@@ -67,11 +69,14 @@ export function useTriggerForm(_options: UseTriggerFormOptions = {}): UseTrigger
   /**
    * Validate a regex pattern.
    */
-  const validatePattern = useCallback((pattern: string): boolean => {
-    const error = validateRegexPattern(pattern);
-    setPatternError(error);
-    return error === null;
-  }, []);
+  const validatePattern = useCallback(
+    (pattern: string): boolean => {
+      const error = validateRegexPattern(pattern);
+      setPatternError(error === null ? null : t('settings.notifications.invalidRegexPattern'));
+      return error === null;
+    },
+    [t]
+  );
 
   /**
    * Clear the preview result.

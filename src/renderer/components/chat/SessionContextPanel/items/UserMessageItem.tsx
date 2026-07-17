@@ -5,6 +5,7 @@
 import React from 'react';
 
 import { COLOR_TEXT_MUTED, COLOR_TEXT_SECONDARY } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { MessageSquare } from 'lucide-react';
 
 import { formatTokens } from '../utils/formatting';
@@ -20,6 +21,7 @@ export const UserMessageItem = ({
   injection,
   onNavigateToTurn,
 }: Readonly<UserMessageItemProps>): React.ReactElement => {
+  const t = useT();
   const turnIndex = injection.turnIndex;
   const isClickable = onNavigateToTurn && turnIndex >= 0;
 
@@ -45,15 +47,15 @@ export const UserMessageItem = ({
               }
             }}
           >
-            @Turn {turnIndex + 1}
+            @{t('chat.turn', { turn: turnIndex + 1 })}
           </span>
         ) : (
           <span className="text-xs" style={{ color: COLOR_TEXT_SECONDARY }}>
-            @Turn {turnIndex + 1}
+            @{t('chat.turn', { turn: turnIndex + 1 })}
           </span>
         )}
         <span className="text-xs" style={{ color: COLOR_TEXT_MUTED }}>
-          ~{formatTokens(injection.estimatedTokens)} tokens
+          {t('chat.tokens', { count: formatTokens(injection.estimatedTokens) })}
         </span>
       </div>
       {injection.textPreview && (

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { isElectronMode } from '@renderer/api';
+import { useT } from '@renderer/i18n';
 import { Bell, HardDrive, Server, Settings, Wrench } from 'lucide-react';
 
 export type SettingsSection = 'general' | 'connection' | 'workspace' | 'notifications' | 'advanced';
@@ -12,23 +13,24 @@ interface SettingsTabsProps {
 
 interface TabConfig {
   id: SettingsSection;
-  label: string;
+  labelKey: string;
   icon: React.ComponentType<{ className?: string }>;
   electronOnly?: boolean;
 }
 
 const tabs: TabConfig[] = [
-  { id: 'general', label: 'General', icon: Settings },
-  { id: 'connection', label: 'Connection', icon: Server, electronOnly: true },
-  { id: 'workspace', label: 'Workspaces', icon: HardDrive, electronOnly: true },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'advanced', label: 'Advanced', icon: Wrench },
+  { id: 'general', labelKey: 'settings.nav.general', icon: Settings },
+  { id: 'connection', labelKey: 'settings.nav.connection', icon: Server, electronOnly: true },
+  { id: 'workspace', labelKey: 'settings.nav.workspace', icon: HardDrive, electronOnly: true },
+  { id: 'notifications', labelKey: 'settings.nav.notifications', icon: Bell },
+  { id: 'advanced', labelKey: 'settings.nav.advanced', icon: Wrench },
 ];
 
 export const SettingsTabs = ({
   activeSection,
   onSectionChange,
 }: Readonly<SettingsTabsProps>): React.JSX.Element => {
+  const t = useT();
   const [hoveredTab, setHoveredTab] = useState<SettingsSection | null>(null);
   const isElectron = useMemo(() => isElectronMode(), []);
   const visibleTabs = useMemo(
@@ -64,7 +66,7 @@ export const SettingsTabs = ({
             }}
           >
             <Icon className="size-4" />
-            <span>{tab.label}</span>
+            <span>{t(tab.labelKey)}</span>
           </button>
         );
       })}

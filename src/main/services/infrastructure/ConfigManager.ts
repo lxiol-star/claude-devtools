@@ -12,6 +12,7 @@
 import { setClaudeBasePathOverride } from '@main/utils/pathDecoder';
 import { validateRegexPattern } from '@main/utils/regexValidation';
 import { createLogger } from '@shared/utils/logger';
+import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -191,9 +192,51 @@ export interface DisplayConfig {
   syntaxHighlighting: boolean;
 }
 
+/**
+ * Per-session user metadata. Stored in the app config only — never written back
+ * to the read-only session log files.
+ */
+export interface SessionAnnotation {
+  /** Free-form tags */
+  tags: string[];
+  /** 0–5 star rating (null = unrated) */
+  score: number | null;
+  /** Free-form note */
+  note: string;
+  /** Unix timestamp of the last edit */
+  updatedAt: number;
+}
+
+/**
+ * A named filter preset ("saved view") that captures the sidebar filter state.
+ * Stored in the app config only — pure local metadata, never written back to
+ * read-only session log files.
+ */
+export interface SavedView {
+  /** Stable identifier generated in the main process */
+  id: string;
+  /** User-given display name */
+  name: string;
+  /** Selected annotation filter tags */
+  tags: string[];
+  /** Minimum star score (0–5) */
+  minScore: number;
+  /** Source-backend filter: 'all' | 'claude' | 'kimi' | 'codex' */
+  sourceFilter: string;
+  /** Unix timestamp of creation */
+  createdAt: number;
+}
+
 export interface SessionsConfig {
   pinnedSessions: Record<string, { sessionId: string; pinnedAt: number }[]>;
   hiddenSessions: Record<string, { sessionId: string; hiddenAt: number }[]>;
+  /**
+   * Per-session annotations. Key is `${contextId}:${projectId}:${sessionId}`
+   * (see buildAnnotationKey).
+   */
+  sessionAnnotations: Record<string, SessionAnnotation>;
+  /** Named filter presets ("saved views") */
+  savedViews: SavedView[];
 }
 
 export interface SshPersistConfig {
@@ -261,6 +304,8 @@ const DEFAULT_CONFIG: AppConfig = {
   sessions: {
     pinnedSessions: {},
     hiddenSessions: {},
+    sessionAnnotations: {},
+    savedViews: [],
   },
   ssh: {
     lastConnection: null,
@@ -858,6 +903,84 @@ export class ConfigManager {
       delete this.config.sessions.hiddenSessions[projectId];
     }
 
+    this.saveConfig();
+  }
+
+  // ===========================================================================
+  // Session Annotation Management
+  // ===========================================================================
+
+  /**
+   * Sets (merges) a session annotation.
+   * @param key - Composite key `${contextId}:${projectId}:${sessionId}` (see buildAnnotationKey)
+   * @param patch - Partial annotation fields to merge over the existing (or empty) annotation
+   */
+  setSessionAnnotation(
+    key: string,
+    patch: Partial<Pick<SessionAnnotation, 'tags' | 'score' | 'note'>>
+  ): void {
+    const existing = this.config.sessions.sessionAnnotations[key] ?? {
+      tags: [],
+      score: null,
+      note: '',
+    };
+
+    const next: SessionAnnotation = {
+      tags: patch.tags ?? existing.tags,
+      score: patch.score !== undefined ? patch.score : existing.score,
+      note: patch.note ?? existing.note,
+      updatedAt: Date.now(),
+    };
+
+    // Drop empty annotations instead of persisting no-op metadata.
+    if (next.tags.length === 0 && next.score === null && next.note.trim().length === 0) {
+      delete this.config.sessions.sessionAnnotations[key];
+    } else {
+      this.config.sessions.sessionAnnotations[key] = next;
+    }
+
+    this.saveConfig();
+  }
+
+  /**
+   * Removes a session annotation.
+   * @param key - Composite key `${contextId}:${projectId}:${sessionId}` (see buildAnnotationKey)
+   */
+  removeSessionAnnotation(key: string): void {
+    delete this.config.sessions.sessionAnnotations[key];
+    this.saveConfig();
+  }
+
+  // ===========================================================================
+  // Saved View Management
+  // ===========================================================================
+
+  /**
+   * Adds a saved view (named filter preset). Generates its id and createdAt.
+   * @param view - The view fields (name, tags, minScore, sourceFilter)
+   * @returns The created saved view (with generated id + createdAt)
+   */
+  addSavedView(view: Omit<SavedView, 'id' | 'createdAt'>): SavedView {
+    const created: SavedView = {
+      id: randomUUID(),
+      name: view.name,
+      tags: view.tags,
+      minScore: view.minScore,
+      sourceFilter: view.sourceFilter,
+      createdAt: Date.now(),
+    };
+
+    this.config.sessions.savedViews.push(created);
+    this.saveConfig();
+    return created;
+  }
+
+  /**
+   * Removes a saved view by id.
+   * @param id - The saved view id to remove
+   */
+  removeSavedView(id: string): void {
+    this.config.sessions.savedViews = this.config.sessions.savedViews.filter((v) => v.id !== id);
     this.saveConfig();
   }
 

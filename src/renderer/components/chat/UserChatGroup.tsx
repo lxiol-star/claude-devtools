@@ -3,6 +3,7 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 
 import { api } from '@renderer/api';
 import { useTabUI } from '@renderer/hooks/useTabUI';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { parseTaskNotifications } from '@shared/utils/contentSanitizer';
 import { createLogger } from '@shared/utils/logger';
@@ -322,6 +323,7 @@ function createUserMarkdownComponents(
  * - Shows image count indicator
  */
 const UserChatGroupInner = ({ userGroup }: Readonly<UserChatGroupProps>): React.JSX.Element => {
+  const t = useT();
   const { content, timestamp, id: groupId } = userGroup;
   const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
   const [validatedPaths, setValidatedPaths] = useState<Record<string, boolean>>({});
@@ -447,7 +449,7 @@ const UserChatGroupInner = ({ userGroup }: Readonly<UserChatGroupProps>): React.
             {format(timestamp, 'h:mm:ss a')}
           </span>
           <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-            You
+            {t('chat.user.you')}
           </span>
           <User className="size-3.5" style={{ color: 'var(--color-text-secondary)' }} />
         </div>
@@ -475,7 +477,7 @@ const UserChatGroupInner = ({ userGroup }: Readonly<UserChatGroupProps>): React.
                 className="mt-2 text-xs underline hover:opacity-80"
                 style={{ color: 'var(--color-text-muted)' }}
               >
-                {isExpanded ? 'Show less' : 'Show more'}
+                {isExpanded ? t('common.showLess') : t('common.showMore')}
               </button>
             )}
           </div>
@@ -522,7 +524,7 @@ const UserChatGroupInner = ({ userGroup }: Readonly<UserChatGroupProps>): React.
                   </div>
                   <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
                     <span className="capitalize">{notif.status}</span>
-                    {exitCode != null && <span>exit {exitCode}</span>}
+                    {exitCode != null && <span>{t('chat.task.exitCode', { code: exitCode })}</span>}
                     {notif.outputFile && (
                       <span className="flex items-center gap-0.5 truncate">
                         <FileText className="size-2.5" />
@@ -538,7 +540,9 @@ const UserChatGroupInner = ({ userGroup }: Readonly<UserChatGroupProps>): React.
         {/* Images indicator */}
         {hasImages && (
           <div className="text-right text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            {content.images.length} image{content.images.length > 1 ? 's' : ''} attached
+            {content.images.length === 1
+              ? t('chat.images.one', { count: content.images.length })
+              : t('chat.images.other', { count: content.images.length })}
           </div>
         )}
       </div>

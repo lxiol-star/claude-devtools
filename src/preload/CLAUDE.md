@@ -17,6 +17,10 @@ Groups exposed methods by domain:
 ### Repository APIs
 - `getRepositoryGroups()`, `getWorktreeSessions()`
 
+### Aggregate (Cross-Backend) APIs
+- `getAllProjects()`, `getAllRepositoryGroups()`, `getAllSessions()`
+- `getSessionDetailByContext()`
+
 ### Validation APIs
 - `validatePath()`, `validateMentions()`
 
@@ -38,6 +42,7 @@ Groups exposed methods by domain:
 - `openPath()` - Shell operations
 - `openExternal()` - Open URLs in browser
 - `onFileChange()` - File watcher events
+- `onContextFileChange()` - Context-tagged file events from inactive local backends (aggregate "All" view)
 - `getZoomFactor()` - Get current zoom level
 - `onZoomFactorChanged()` - Zoom change listener
 - `session.scrollToLine()` - Deep link navigation

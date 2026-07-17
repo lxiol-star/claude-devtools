@@ -5,6 +5,7 @@
 
 import React from 'react';
 
+import { useT } from '@renderer/i18n';
 import { Loader2 } from 'lucide-react';
 
 interface OngoingIndicatorProps {
@@ -23,19 +24,20 @@ interface OngoingIndicatorProps {
 export const OngoingIndicator = ({
   size = 'sm',
   showLabel = false,
-  label = 'Session in progress...',
+  label,
 }: Readonly<OngoingIndicatorProps>): React.JSX.Element => {
+  const t = useT();
   const dotSize = size === 'sm' ? 'h-2 w-2' : 'h-2.5 w-2.5';
 
   return (
-    <span className="inline-flex items-center gap-2" title="Session in progress">
+    <span className="inline-flex items-center gap-2" title={t('layout.sessionInProgress')}>
       <span className={`relative flex ${dotSize} shrink-0`}>
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-400 opacity-75" />
         <span className={`relative inline-flex rounded-full ${dotSize} bg-green-500`} />
       </span>
       {showLabel && (
         <span className="text-sm" style={{ color: 'var(--info-text, #3b82f6)' }}>
-          {label}
+          {label ?? t('layout.sessionInProgressLabel')}
         </span>
       )}
     </span>
@@ -47,6 +49,8 @@ export const OngoingIndicator = ({
  * Shows animated spinner and text.
  */
 export const OngoingBanner = (): React.JSX.Element => {
+  const t = useT();
+
   return (
     <div
       className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3"
@@ -60,7 +64,7 @@ export const OngoingBanner = (): React.JSX.Element => {
         style={{ color: 'var(--info-text, #3b82f6)' }}
       />
       <span className="text-sm" style={{ color: 'var(--info-text, #3b82f6)' }}>
-        Session is in progress...
+        {t('layout.sessionInProgressBanner')}
       </span>
     </div>
   );

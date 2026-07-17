@@ -4,6 +4,7 @@
  * This module initializes and registers all IPC handlers from domain modules:
  * - projects.ts: Project listing and repository groups
  * - sessions.ts: Session operations and pagination
+ * - aggregate.ts: Cross-backend (multi-context) aggregate operations
  * - search.ts: Session search functionality
  * - subagents.ts: Subagent detail retrieval
  * - validation.ts: Path validation and scroll handling
@@ -16,6 +17,11 @@
 import { createLogger } from '@shared/utils/logger';
 import { ipcMain } from 'electron';
 
+import {
+  initializeAggregateHandlers,
+  registerAggregateHandlers,
+  removeAggregateHandlers,
+} from './aggregate';
 import { initializeConfigHandlers, registerConfigHandlers, removeConfigHandlers } from './config';
 import {
   initializeContextHandlers,
@@ -75,6 +81,7 @@ export function initializeIpcHandlers(
   // Initialize domain handlers with registry
   initializeProjectHandlers(registry);
   initializeSessionHandlers(registry);
+  initializeAggregateHandlers(registry);
   initializeSearchHandlers(registry);
   initializeSubagentHandlers(registry);
   initializeUpdaterHandlers(updater);
@@ -88,6 +95,7 @@ export function initializeIpcHandlers(
   // Register all handlers
   registerProjectHandlers(ipcMain);
   registerSessionHandlers(ipcMain);
+  registerAggregateHandlers(ipcMain);
   registerSearchHandlers(ipcMain);
   registerSubagentHandlers(ipcMain);
   registerValidationHandlers(ipcMain);
@@ -110,6 +118,7 @@ export function initializeIpcHandlers(
 export function removeIpcHandlers(): void {
   removeProjectHandlers(ipcMain);
   removeSessionHandlers(ipcMain);
+  removeAggregateHandlers(ipcMain);
   removeSearchHandlers(ipcMain);
   removeSubagentHandlers(ipcMain);
   removeValidationHandlers(ipcMain);

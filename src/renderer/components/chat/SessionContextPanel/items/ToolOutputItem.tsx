@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 
 import { COLOR_TEXT_MUTED, COLOR_TEXT_SECONDARY } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 import { ChevronRight, Wrench } from 'lucide-react';
 
 import { formatTokens } from '../utils/formatting';
@@ -22,6 +23,7 @@ export const ToolOutputItem = ({
   injection,
   onNavigateToTurn,
 }: Readonly<ToolOutputItemProps>): React.ReactElement => {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const turnIndex = injection.turnIndex;
   const isClickable = onNavigateToTurn && turnIndex >= 0;
@@ -58,15 +60,15 @@ export const ToolOutputItem = ({
             }
           }}
         >
-          @Turn {turnIndex + 1}
+          @{t('chat.turn', { turn: turnIndex + 1 })}
         </span>
       ) : (
         <span className="text-xs" style={{ color: COLOR_TEXT_SECONDARY }}>
-          @Turn {turnIndex + 1}
+          @{t('chat.turn', { turn: turnIndex + 1 })}
         </span>
       )}
       <span className="text-xs" style={{ color: COLOR_TEXT_MUTED }}>
-        ~{formatTokens(injection.estimatedTokens)} tokens
+        {t('chat.tokens', { count: formatTokens(injection.estimatedTokens) })}
       </span>
       <span
         className="rounded px-1 py-0.5 text-xs"
@@ -75,7 +77,9 @@ export const ToolOutputItem = ({
           color: COLOR_TEXT_MUTED,
         }}
       >
-        {injection.toolCount} tool{injection.toolCount !== 1 ? 's' : ''}
+        {injection.toolCount === 1
+          ? t('chat.tool.one', { count: injection.toolCount })
+          : t('chat.tool.other', { count: injection.toolCount })}
       </span>
     </>
   );

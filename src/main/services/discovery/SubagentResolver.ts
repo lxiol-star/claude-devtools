@@ -10,7 +10,7 @@
  */
 
 import { type ParsedMessage, type Process, type SessionMetrics, type ToolCall } from '@main/types';
-import { calculateMetrics, checkMessagesOngoing, parseJsonlFile } from '@main/utils/jsonl';
+import { calculateMetrics, checkMessagesOngoing } from '@main/utils/jsonl';
 import { createLogger } from '@shared/utils/logger';
 import * as path from 'path';
 
@@ -88,7 +88,7 @@ export class SubagentResolver {
    */
   private async parseSubagentFile(filePath: string): Promise<Process | null> {
     try {
-      const messages = await parseJsonlFile(filePath, this.projectScanner.getFileSystemProvider());
+      const messages = await this.projectScanner.parseSessionFile(filePath);
 
       if (messages.length === 0) {
         return null;
@@ -100,9 +100,11 @@ export class SubagentResolver {
         return null;
       }
 
-      // Extract agent ID from filename (agent-{id}.jsonl)
+      // Extract agent ID from the containing directory name for Kimi, or filename for Claude.
       const filename = path.basename(filePath);
-      const agentId = filename.replace(/^agent-/, '').replace(/\.jsonl$/, '');
+      const parentDir = path.basename(path.dirname(filePath));
+      const agentId =
+        filename === 'wire.jsonl' ? parentDir : filename.replace(/^agent-/, '').replace(/\.jsonl$/, '');
 
       // Filter out compact files (context compaction artifacts, not real subagents)
       if (agentId.startsWith('acompact')) {

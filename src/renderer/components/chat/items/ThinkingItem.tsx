@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { useT } from '@renderer/i18n';
 import { Brain } from 'lucide-react';
 
 import { MarkdownViewer } from '../viewers';
@@ -32,6 +33,7 @@ export const ThinkingItem: React.FC<ThinkingItemProps> = React.memo(function Thi
   highlightStyle,
   notificationDotColor,
 }) {
+  const t = useT();
   const fullContent = step.content.thinkingText ?? preview;
   const truncatedPreview = truncateText(preview, 60);
 
@@ -41,7 +43,7 @@ export const ThinkingItem: React.FC<ThinkingItemProps> = React.memo(function Thi
   return (
     <BaseItem
       icon={<Brain className="size-4" />}
-      label="Thinking"
+      label={t('chat.thinking')}
       summary={truncatedPreview}
       tokenCount={tokenCount}
       onClick={onClick}

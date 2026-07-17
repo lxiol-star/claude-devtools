@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@renderer/api';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { formatModifierShortcut } from '@renderer/utils/keyboardUtils';
 import { createLogger } from '@shared/utils/logger';
@@ -61,39 +62,43 @@ const SessionIdMatchItemInner = ({
   sessionId,
   isSelected,
   onClick,
-}: Readonly<SessionIdMatchItemProps>): React.JSX.Element => (
-  <button
-    onClick={onClick}
-    className={`w-full px-4 py-3 text-left transition-colors ${
-      isSelected ? 'bg-surface-raised' : 'hover:bg-surface-raised/50'
-    }`}
-  >
-    <div className="flex items-start gap-3">
-      <div className="mt-0.5 shrink-0 text-green-400">
-        <FileText className="size-4" />
+}: Readonly<SessionIdMatchItemProps>): React.JSX.Element => {
+  const t = useT();
+
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full px-4 py-3 text-left transition-colors ${
+        isSelected ? 'bg-surface-raised' : 'hover:bg-surface-raised/50'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 shrink-0 text-green-400">
+          <FileText className="size-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <FolderGit2 className="size-3 text-blue-400" />
+            <span className="truncate text-xs font-medium text-blue-400">{projectName}</span>
+          </div>
+          <div className="text-sm text-text">
+            {sessionTitle ? sessionTitle.slice(0, 100) : t('search.untitledSession')}
+          </div>
+          <div className="mt-1 flex items-center gap-3 text-xs text-text-muted">
+            <span>{t('search.messageCount', { count: messageCount })}</span>
+            <span>&middot;</span>
+            <span>
+              {createdAt > 0
+                ? formatDistanceToNow(new Date(createdAt), { addSuffix: true })
+                : t('common.unknown')}
+            </span>
+          </div>
+          <div className="text-text-muted/60 mt-1 font-mono text-[10px]">{sessionId}</div>
+        </div>
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-center gap-2">
-          <FolderGit2 className="size-3 text-blue-400" />
-          <span className="truncate text-xs font-medium text-blue-400">{projectName}</span>
-        </div>
-        <div className="text-sm text-text">
-          {sessionTitle ? sessionTitle.slice(0, 100) : 'Untitled session'}
-        </div>
-        <div className="mt-1 flex items-center gap-3 text-xs text-text-muted">
-          <span>{messageCount} messages</span>
-          <span>&middot;</span>
-          <span>
-            {createdAt > 0
-              ? formatDistanceToNow(new Date(createdAt), { addSuffix: true })
-              : 'Unknown'}
-          </span>
-        </div>
-        <div className="text-text-muted/60 mt-1 font-mono text-[10px]">{sessionId}</div>
-      </div>
-    </div>
-  </button>
-);
+    </button>
+  );
+};
 
 const SessionIdMatchItem = React.memo(SessionIdMatchItemInner);
 
@@ -112,9 +117,10 @@ const ProjectResultItemInner = ({
   isSelected,
   onClick,
 }: Readonly<ProjectResultItemProps>): React.JSX.Element => {
+  const t = useT();
   const lastActivity = repo.mostRecentSession
     ? formatDistanceToNow(new Date(repo.mostRecentSession), { addSuffix: true })
-    : 'No recent activity';
+    : t('search.noRecentActivity');
 
   return (
     <button
@@ -133,7 +139,7 @@ const ProjectResultItemInner = ({
             {repo.worktrees[0]?.path || ''}
           </div>
           <div className="mt-1 flex items-center gap-3 text-xs text-text-muted">
-            <span>{repo.totalSessions} sessions</span>
+            <span>{t('search.sessionCount', { count: repo.totalSessions })}</span>
             <span>·</span>
             <span>{lastActivity}</span>
           </div>
@@ -215,6 +221,7 @@ const SessionResultItem = React.memo(SessionResultItemInner);
 // =============================================================================
 
 export const CommandPalette = (): React.JSX.Element | null => {
+  const t = useT();
   const {
     commandPaletteOpen,
     closeCommandPalette,
@@ -269,8 +276,8 @@ export const CommandPalette = (): React.JSX.Element | null => {
   const selectedProjectName = useMemo(
     () =>
       (selectedProjectId ? projectNameByWorktreeId.get(selectedProjectId) : undefined) ??
-      'Current project',
-    [projectNameByWorktreeId, selectedProjectId]
+      t('search.currentProject'),
+    [projectNameByWorktreeId, selectedProjectId, t]
   );
 
   // Determine search mode based on whether a project is selected OR global search is enabled
@@ -644,18 +651,20 @@ export const CommandPalette = (): React.JSX.Element | null => {
               {queryIsSessionId ? (
                 <>
                   <Search className="size-3.5 text-green-400" />
-                  <span className="text-xs text-green-400">Session ID search</span>
+                  <span className="text-xs text-green-400">{t('search.sessionIdSearch')}</span>
                 </>
               ) : searchMode === 'projects' ? (
                 <>
                   <FolderGit2 className="size-3.5 text-text-muted" />
-                  <span className="text-xs text-text-muted">Search projects</span>
+                  <span className="text-xs text-text-muted">{t('search.searchProjects')}</span>
                 </>
               ) : (
                 <>
                   <MessageSquare className="size-3.5 text-text-muted" />
                   <span className="text-xs text-text-muted">
-                    {globalSearchEnabled ? 'Search across all projects' : 'Search in project'}
+                    {globalSearchEnabled
+                      ? t('search.searchAcrossAllProjects')
+                      : t('search.searchInProject')}
                   </span>
                   {!globalSearchEnabled && (
                     <>
@@ -677,12 +686,12 @@ export const CommandPalette = (): React.JSX.Element | null => {
               }`}
               title={
                 !globalSearchEnabled
-                  ? `Search across all projects (${formatModifierShortcut('G')})`
+                  ? t('search.searchAllProjectsTitle', { shortcut: formatModifierShortcut('G') })
                   : undefined
               }
             >
               <Globe className="size-3" />
-              <span>Global</span>
+              <span>{t('search.global')}</span>
             </button>
           </div>
         </div>
@@ -698,8 +707,8 @@ export const CommandPalette = (): React.JSX.Element | null => {
             onKeyDown={handleKeyDown}
             placeholder={
               searchMode === 'projects'
-                ? 'Search projects or paste session ID...'
-                : 'Search conversations or paste session ID...'
+                ? t('search.placeholderProjects')
+                : t('search.placeholderConversations')
             }
             className="placeholder:text-text-muted/50 flex-1 bg-transparent text-base text-text focus:outline-none"
           />
@@ -724,7 +733,7 @@ export const CommandPalette = (): React.JSX.Element | null => {
                       ? projectNameByWorktreeId.get(sessionIdMatch.projectId)
                       : undefined) ??
                     sessionIdMatch.projectId ??
-                    'Unknown'
+                    t('common.unknown')
                   }
                   sessionTitle={sessionIdMatch.session.firstMessage ?? ''}
                   messageCount={sessionIdMatch.session.messageCount}
@@ -736,7 +745,7 @@ export const CommandPalette = (): React.JSX.Element | null => {
               </div>
             ) : (
               <div className="px-4 py-8 text-center text-sm text-text-muted">
-                No session found with ID &ldquo;{query.trim().slice(0, 8)}...&rdquo;
+                {t('search.noSessionWithId', { id: query.trim().slice(0, 8) })}
               </div>
             )
           ) : queryIsFragment ? (
@@ -758,14 +767,16 @@ export const CommandPalette = (): React.JSX.Element | null => {
               </div>
             ) : (
               <div className="px-4 py-8 text-center text-sm text-text-muted">
-                No sessions found matching &ldquo;{query.trim()}&rdquo;
+                {t('search.noSessionsMatching', { query: query.trim() })}
               </div>
             )
           ) : searchMode === 'projects' ? (
             // Project search results
             filteredProjects.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-text-muted">
-                {query.trim() ? `No projects found for "${query}"` : 'No projects found'}
+                {query.trim()
+                  ? t('search.noProjectsForQuery', { query })
+                  : t('search.noProjects')}
               </div>
             ) : (
               <div className="py-2">
@@ -782,13 +793,13 @@ export const CommandPalette = (): React.JSX.Element | null => {
           ) : // Session search results
           query.trim().length < 2 ? (
             <div className="px-4 py-8 text-center text-sm text-text-muted">
-              Type at least 2 characters to search
+              {t('search.typeToSearch')}
             </div>
           ) : sessionResults.length === 0 && !loading ? (
             <div className="px-4 py-8 text-center text-sm text-text-muted">
               {searchIsPartial
-                ? `No fast results in recent sessions for "${query}"`
-                : `No results found for "${query}"`}
+                ? t('search.noFastResults', { query })
+                : t('search.noResultsForQuery', { query })}
             </div>
           ) : (
             <div className="py-2">
@@ -817,28 +828,37 @@ export const CommandPalette = (): React.JSX.Element | null => {
         <div className="flex items-center justify-between border-t border-border px-4 py-2 text-xs text-text-muted">
           <span>
             {searchMode === 'projects'
-              ? `${filteredProjects.length} project${filteredProjects.length !== 1 ? 's' : ''}`
+              ? t('search.projectCount', {
+                  count: filteredProjects.length,
+                  plural: filteredProjects.length !== 1 ? 's' : '',
+                })
               : totalMatches > 0
-                ? `${totalMatches} ${searchIsPartial ? 'fast ' : ''}result${totalMatches !== 1 ? 's' : ''}${globalSearchEnabled ? ' across all projects' : ''}`
-                : 'Type to search'}
+                ? t('search.resultCountFooter', {
+                    count: totalMatches,
+                    fast: searchIsPartial ? t('search.fast') : '',
+                    plural: totalMatches !== 1 ? 's' : '',
+                    scope: globalSearchEnabled ? t('search.scopeAllProjects') : '',
+                  })
+                : t('search.typeToSearchFooter')}
           </span>
           <div className="flex items-center gap-4">
             <span>
               <kbd className="rounded bg-surface-overlay px-1.5 py-0.5 text-[10px]">↑↓</kbd>{' '}
-              navigate
+              {t('search.hintNavigate')}
             </span>
             <span>
               <kbd className="rounded bg-surface-overlay px-1.5 py-0.5 text-[10px]">↵</kbd>{' '}
-              {searchMode === 'projects' ? 'select' : 'open'}
+              {searchMode === 'projects' ? t('search.hintSelect') : t('search.hintOpen')}
             </span>
             <span>
               <kbd className="rounded bg-surface-overlay px-1.5 py-0.5 text-[10px]">
                 {formatModifierShortcut('G')}
               </kbd>{' '}
-              global
+              {t('search.hintGlobal')}
             </span>
             <span>
-              <kbd className="rounded bg-surface-overlay px-1.5 py-0.5 text-[10px]">esc</kbd> close
+              <kbd className="rounded bg-surface-overlay px-1.5 py-0.5 text-[10px]">esc</kbd>{' '}
+              {t('search.hintClose')}
             </span>
           </div>
         </div>

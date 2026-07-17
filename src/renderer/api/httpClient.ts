@@ -7,6 +7,7 @@
  */
 
 import type {
+  AggregateMetrics,
   AppConfig,
   ClaudeMdFileInfo,
   ClaudeRootFolderSelection,
@@ -30,10 +31,12 @@ import type {
   PaginatedSessionsResult,
   Project,
   RepositoryGroup,
+  SavedView,
   SearchSessionsResult,
   Session,
   SessionAPI,
   SessionDetail,
+  SessionDetailResponse,
   SessionMetrics,
   SessionsByIdsOptions,
   SessionsPaginationOptions,
@@ -286,6 +289,47 @@ export class HttpAPIClient implements ElectronAPI {
     this.get<Session[]>(`/api/worktrees/${encodeURIComponent(worktreeId)}/sessions`);
 
   // ---------------------------------------------------------------------------
+  // Aggregate (cross-backend) APIs
+  // ---------------------------------------------------------------------------
+
+  getAllProjects = (): Promise<Project[]> => this.get<Project[]>('/api/all-projects');
+
+  getAllRepositoryGroups = (): Promise<RepositoryGroup[]> =>
+    this.get<RepositoryGroup[]>('/api/all-repository-groups');
+
+  getAllSessions = (projectId: string): Promise<Session[]> =>
+    this.get<Session[]>(`/api/all-sessions?projectId=${encodeURIComponent(projectId)}`);
+
+  getSessionDetailByContext = (params: {
+    contextId: string;
+    sessionId: string;
+    projectId?: string;
+  }): Promise<SessionDetailResponse | null> => {
+    const qs = new URLSearchParams({
+      contextId: params.contextId,
+      sessionId: params.sessionId,
+    });
+    if (params.projectId !== undefined) qs.set('projectId', params.projectId);
+    return this.get<SessionDetailResponse | null>(`/api/session-detail-by-context?${qs}`);
+  };
+
+  getWaterfallDataByContext = (params: {
+    contextId: string;
+    sessionId: string;
+    projectId?: string;
+  }): Promise<WaterfallData | null> => {
+    const qs = new URLSearchParams({
+      contextId: params.contextId,
+      sessionId: params.sessionId,
+    });
+    if (params.projectId !== undefined) qs.set('projectId', params.projectId);
+    return this.get<WaterfallData | null>(`/api/waterfall-data-by-context?${qs}`);
+  };
+
+  getAggregateMetrics = (): Promise<AggregateMetrics> =>
+    this.get<AggregateMetrics>('/api/aggregate-metrics');
+
+  // ---------------------------------------------------------------------------
   // Validation
   // ---------------------------------------------------------------------------
 
@@ -446,13 +490,15 @@ export class HttpAPIClient implements ElectronAPI {
       return null;
     },
     getClaudeRootInfo: async (): Promise<ClaudeRootInfo> => {
-      const config = await this.config.get();
-      const fallbackPath = config.general.claudeRootPath ?? '~/.claude';
-      return {
-        defaultPath: fallbackPath,
-        resolvedPath: fallbackPath,
-        customPath: config.general.claudeRootPath,
-      };
+      const result = await this.get<{
+        success: boolean;
+        data?: ClaudeRootInfo;
+        error?: string;
+      }>('/api/config/root-info');
+      if (!result.success || !result.data) {
+        throw new Error(result.error ?? 'Failed to load data root info');
+      }
+      return result.data;
     },
     findWslClaudeRoots: async (): Promise<WslClaudeRootCandidate[]> => {
       console.warn('[HttpAPIClient] findWslClaudeRoots is not available in browser mode');
@@ -473,6 +519,24 @@ export class HttpAPIClient implements ElectronAPI {
       this.post('/api/config/hide-sessions', { projectId, sessionIds }),
     unhideSessions: (projectId: string, sessionIds: string[]): Promise<void> =>
       this.post('/api/config/unhide-sessions', { projectId, sessionIds }),
+    setSessionAnnotation: (
+      key: string,
+      patch: Partial<{ tags: string[]; score: number | null; note: string }>
+    ): Promise<void> => this.post('/api/config/set-session-annotation', { key, patch }),
+    removeSessionAnnotation: (key: string): Promise<void> =>
+      this.post('/api/config/remove-session-annotation', { key }),
+    addSavedView: async (view: Omit<SavedView, 'id' | 'createdAt'>): Promise<SavedView> => {
+      const result = await this.post<{ success: boolean; data?: SavedView; error?: string }>(
+        '/api/config/add-saved-view',
+        view
+      );
+      if (!result.success || !result.data) {
+        throw new Error(result.error ?? 'Failed to add saved view');
+      }
+      return result.data;
+    },
+    removeSavedView: (id: string): Promise<void> =>
+      this.post('/api/config/remove-saved-view', { id }),
   };
 
   // ---------------------------------------------------------------------------
@@ -504,6 +568,11 @@ export class HttpAPIClient implements ElectronAPI {
 
   onTodoChange = (callback: (event: FileChangeEvent) => void): (() => void) =>
     this.addEventListener('todo-change', callback);
+
+  // Context-tagged file changes from inactive local contexts (aggregate "All" view)
+  onContextFileChange = (
+    callback: (payload: { contextId: string; event: FileChangeEvent }) => void
+  ): (() => void) => this.addEventListener('context-file-change', callback);
 
   // No-op in browser mode — Ctrl+R refresh is Electron-only
   onSessionRefresh = (_callback: () => void): (() => void) => {

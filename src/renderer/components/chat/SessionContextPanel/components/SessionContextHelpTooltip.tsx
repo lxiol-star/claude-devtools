@@ -5,9 +5,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useT } from '@renderer/i18n';
 import { HelpCircle } from 'lucide-react';
 
 export const SessionContextHelpTooltip = (): React.ReactElement => {
+  const t = useT();
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
   const [arrowStyle, setArrowStyle] = useState<React.CSSProperties>({});
@@ -119,18 +121,17 @@ export const SessionContextHelpTooltip = (): React.ReactElement => {
               {/* What is Visible Context */}
               <div>
                 <div className="mb-1 font-semibold" style={{ color: 'var(--color-text)' }}>
-                  What is Visible Context?
+                  {t('chat.contextHelp.whatIsTitle')}
                 </div>
                 <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                  Tokens consumed by file reads, tool outputs, and configuration files (CLAUDE.md)
-                  that are injected into the conversation.
+                  {t('chat.contextHelp.whatIsBody')}
                 </p>
               </div>
 
               {/* Difference with Total */}
               <div className="pt-2" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
                 <div className="mb-1 font-semibold" style={{ color: 'var(--color-text)' }}>
-                  Total Context vs Visible Context
+                  {t('chat.contextHelp.vsTitle')}
                 </div>
                 <div
                   className="space-y-2"
@@ -141,10 +142,10 @@ export const SessionContextHelpTooltip = (): React.ReactElement => {
                       className="min-w-[74px] text-left"
                       style={{ color: 'var(--color-text-muted)' }}
                     >
-                      Total:
+                      {t('chat.contextPanel.totalLabel')}
                     </span>
                     <span className="flex-1 leading-snug">
-                      Total tokens that are injected into the conversation
+                      {t('chat.contextHelp.totalDesc')}
                     </span>
                   </div>
                   <div className="flex">
@@ -152,10 +153,10 @@ export const SessionContextHelpTooltip = (): React.ReactElement => {
                       className="min-w-[74px] text-left"
                       style={{ color: 'var(--color-text-muted)' }}
                     >
-                      Visible:
+                      {t('chat.contextPanel.visibleLabel')}
                     </span>
                     <span className="flex-1 leading-snug">
-                      Subset of tokens that you can optimize &amp; debug
+                      {t('chat.contextHelp.visibleDesc')}
                     </span>
                   </div>
                 </div>
@@ -164,15 +165,15 @@ export const SessionContextHelpTooltip = (): React.ReactElement => {
               {/* Tips */}
               <div className="pt-2" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
                 <div className="mb-1 font-semibold" style={{ color: 'var(--color-text)' }}>
-                  Optimization Tips
+                  {t('chat.contextHelp.tipsTitle')}
                 </div>
                 <ul
                   className="space-y-1 pl-3"
                   style={{ color: 'var(--color-text-secondary)', lineHeight: 1.5 }}
                 >
-                  <li className="list-disc">Shorten large CLAUDE.md files</li>
-                  <li className="list-disc">Split large @-mentioned files</li>
-                  <li className="list-disc">Adjust MCP tool output verbosity</li>
+                  <li className="list-disc">{t('chat.contextHelp.tipShortenClaudeMd')}</li>
+                  <li className="list-disc">{t('chat.contextHelp.tipSplitFiles')}</li>
+                  <li className="list-disc">{t('chat.contextHelp.tipMcpVerbosity')}</li>
                 </ul>
               </div>
             </div>

@@ -3,6 +3,7 @@
  *
  * Routes:
  * - GET /api/config - Get full config
+ * - GET /api/config/root-info - Get local data root info (path + detected backend)
  * - POST /api/config/update - Update config section
  * - POST /api/config/ignore-regex - Add ignore pattern
  * - DELETE /api/config/ignore-regex - Remove ignore pattern
@@ -21,6 +22,8 @@
  * - POST /api/config/open-in-editor - No-op in browser
  */
 
+import { detectBackend } from '@main/backends';
+import { getAutoDetectedClaudeBasePath, getClaudeBasePath } from '@main/utils/pathDecoder';
 import { getErrorMessage } from '@shared/utils/errorHandling';
 import { createLogger } from '@shared/utils/logger';
 
@@ -29,6 +32,7 @@ import { validateTriggerId } from '../ipc/guards';
 import {
   ConfigManager,
   type NotificationTrigger,
+  type SavedView,
   type TriggerContentType,
   type TriggerMatchField,
   type TriggerMode,
@@ -36,6 +40,7 @@ import {
 } from '../services';
 
 import type { TriggerColor } from '@shared/constants/triggerColors';
+import type { ClaudeRootInfo } from '@shared/types';
 import type { FastifyInstance } from 'fastify';
 
 const logger = createLogger('HTTP:config');
@@ -56,6 +61,25 @@ export function registerConfigRoutes(app: FastifyInstance): void {
       return { success: true, data: config };
     } catch (error) {
       logger.error('Error in GET /api/config:', error);
+      return { success: false, error: getErrorMessage(error) };
+    }
+  });
+
+  // Get local data root info (mirrors the Electron config:getClaudeRootInfo IPC handler)
+  app.get('/api/config/root-info', async (): Promise<ConfigResult<ClaudeRootInfo>> => {
+    try {
+      const resolvedPath = getClaudeBasePath();
+      return {
+        success: true,
+        data: {
+          defaultPath: getAutoDetectedClaudeBasePath(),
+          resolvedPath,
+          customPath: configManager.getConfig().general.claudeRootPath,
+          backend: detectBackend(resolvedPath) ?? 'claude',
+        },
+      };
+    } catch (error) {
+      logger.error('Error in GET /api/config/root-info:', error);
       return { success: false, error: getErrorMessage(error) };
     }
   });
@@ -469,6 +493,133 @@ export function registerConfigRoutes(app: FastifyInstance): void {
       }
     }
   );
+
+  // Set (merge) session annotation
+  app.post<{ Body: { key: string; patch: unknown } }>(
+    '/api/config/set-session-annotation',
+    async (request) => {
+      try {
+        const { key, patch } = request.body;
+        if (!key || typeof key !== 'string') {
+          return { success: false, error: 'Annotation key is required and must be a string' };
+        }
+        if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+          return { success: false, error: 'Annotation patch must be an object' };
+        }
+
+        const source = patch as Record<string, unknown>;
+        const normalized: Partial<{ tags: string[]; score: number | null; note: string }> = {};
+
+        if ('tags' in source) {
+          if (!Array.isArray(source.tags) || source.tags.some((tag) => typeof tag !== 'string')) {
+            return { success: false, error: 'tags must be an array of strings' };
+          }
+          normalized.tags = source.tags as string[];
+        }
+        if ('score' in source) {
+          const score = source.score;
+          if (
+            score !== null &&
+            (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 5)
+          ) {
+            return { success: false, error: 'score must be null or a number between 0 and 5' };
+          }
+          normalized.score = score;
+        }
+        if ('note' in source) {
+          if (typeof source.note !== 'string') {
+            return { success: false, error: 'note must be a string' };
+          }
+          normalized.note = source.note;
+        }
+
+        configManager.setSessionAnnotation(key, normalized);
+        return { success: true };
+      } catch (error) {
+        logger.error('Error in POST /api/config/set-session-annotation:', error);
+        return { success: false, error: getErrorMessage(error) };
+      }
+    }
+  );
+
+  // Remove session annotation
+  app.post<{ Body: { key: string } }>(
+    '/api/config/remove-session-annotation',
+    async (request) => {
+      try {
+        const { key } = request.body;
+        if (!key || typeof key !== 'string') {
+          return { success: false, error: 'Annotation key is required and must be a string' };
+        }
+
+        configManager.removeSessionAnnotation(key);
+        return { success: true };
+      } catch (error) {
+        logger.error('Error in POST /api/config/remove-session-annotation:', error);
+        return { success: false, error: getErrorMessage(error) };
+      }
+    }
+  );
+
+  // Add saved view (returns the created view)
+  app.post<{ Body: unknown }>(
+    '/api/config/add-saved-view',
+    async (request): Promise<ConfigResult<SavedView>> => {
+      try {
+        const source = request.body as Record<string, unknown> | null;
+        if (typeof source !== 'object' || source === null || Array.isArray(source)) {
+          return { success: false, error: 'Saved view must be an object' };
+        }
+        if (typeof source.name !== 'string' || source.name.trim().length === 0) {
+          return { success: false, error: 'name is required and must be a non-empty string' };
+        }
+        if (!Array.isArray(source.tags) || source.tags.some((tag) => typeof tag !== 'string')) {
+          return { success: false, error: 'tags must be an array of strings' };
+        }
+        if (
+          typeof source.minScore !== 'number' ||
+          !Number.isFinite(source.minScore) ||
+          source.minScore < 0 ||
+          source.minScore > 5
+        ) {
+          return { success: false, error: 'minScore must be a number between 0 and 5' };
+        }
+        if (
+          typeof source.sourceFilter !== 'string' ||
+          !['all', 'claude', 'kimi', 'codex'].includes(source.sourceFilter)
+        ) {
+          return { success: false, error: 'sourceFilter must be one of all, claude, kimi, codex' };
+        }
+
+        const created = configManager.addSavedView({
+          name: source.name.trim(),
+          tags: source.tags as string[],
+          minScore: source.minScore,
+          sourceFilter: source.sourceFilter,
+        });
+        return { success: true, data: created };
+      } catch (error) {
+        logger.error('Error in POST /api/config/add-saved-view:', error);
+        return { success: false, error: getErrorMessage(error) };
+      }
+    }
+  );
+
+  // Remove saved view
+  app.post<{ Body: { id: string } }>('/api/config/remove-saved-view', async (request) => {
+    try {
+      const { id } = request.body;
+      if (!id || typeof id !== 'string') {
+        return { success: false, error: 'Saved view id is required and must be a string' };
+      }
+
+      configManager.removeSavedView(id);
+      return { success: true };
+    } catch (error) {
+      logger.error('Error in POST /api/config/remove-saved-view:', error);
+      return { success: false, error: getErrorMessage(error) };
+    }
+  });
 
   // Select folders - no-op in browser mode
   app.post('/api/config/select-folders', async (): Promise<ConfigResult<string[]>> => {

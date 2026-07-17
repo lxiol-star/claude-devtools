@@ -11,6 +11,7 @@ import {
   COLOR_SURFACE_OVERLAY,
   COLOR_TEXT_MUTED,
 } from '@renderer/constants/cssVariables';
+import { useT } from '@renderer/i18n';
 
 import { ClaudeMdFilesSection } from './components/ClaudeMdFilesSection';
 import { FlatInjectionList } from './components/FlatInjectionList';
@@ -52,6 +53,7 @@ export const SessionContextPanel = ({
   selectedPhase,
   onPhaseChange,
 }: Readonly<SessionContextPanelProps>): React.ReactElement => {
+  const t = useT();
   // View mode: category sections or ranked list
   const [viewMode, setViewMode] = useState<ContextViewMode>('category');
   // Flat sub-toggle within "By Size" view
@@ -205,7 +207,7 @@ export const SessionContextPanel = ({
             className="flex h-full items-center justify-center text-sm"
             style={{ color: COLOR_TEXT_MUTED }}
           >
-            No context injections detected in this session
+            {t('chat.contextPanel.empty')}
           </div>
         ) : viewMode === 'category' ? (
           <>
@@ -271,7 +273,7 @@ export const SessionContextPanel = ({
                   color: !flatMode ? '#818cf8' : COLOR_TEXT_MUTED,
                 }}
               >
-                Grouped
+                {t('chat.contextPanel.grouped')}
               </button>
               <button
                 onClick={() => setFlatMode(true)}
@@ -281,7 +283,7 @@ export const SessionContextPanel = ({
                   color: flatMode ? '#818cf8' : COLOR_TEXT_MUTED,
                 }}
               >
-                Flat
+                {t('chat.contextPanel.flat')}
               </button>
             </div>
             {flatMode ? (

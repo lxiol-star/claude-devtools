@@ -18,6 +18,7 @@ import ReactMarkdown from 'react-markdown';
 
 import { api } from '@renderer/api';
 import { markdownComponents } from '@renderer/components/chat/markdownComponents';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { Check, Copy } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
@@ -114,6 +115,7 @@ function resolveWikilink(rawSlug: string, rows: ListRow[]): string | null {
 }
 
 export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element => {
+  const t = useT();
   const { index, hasMemory, fileContents, loadMemoryForProject, toggleMemoryEntry, expanded } =
     useStore(
       useShallow((s) => ({
@@ -137,7 +139,7 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
     if (!index) return [];
     const indexRow: ListRow = {
       key: INDEX_FILE,
-      title: 'Index',
+      title: t('memory.indexTitle'),
       hook: 'MEMORY.md',
       fileName: INDEX_FILE,
       kind: 'index',
@@ -157,7 +159,7 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
       kind: 'orphan' as const,
     }));
     return [indexRow, ...entryRows, ...orphanRows];
-  }, [index]);
+  }, [index, t]);
 
   // Compute the displayed file during render rather than via an effect+setState
   // dance. The state cell only tracks the user's explicit choice; when it goes
@@ -245,7 +247,7 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
                 color: resolved ? 'var(--prose-link)' : 'var(--color-text-muted)',
                 fontWeight: 500,
               }}
-              title={resolved ? `Open ${target}` : 'No matching memory layer'}
+              title={resolved ? t('memory.openLayerTitle', { target }) : t('memory.noMatchingLayer')}
             >
               {children}
             </a>
@@ -273,7 +275,7 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
         );
       },
     }),
-    [resolveLayerHref]
+    [resolveLayerHref, t]
   );
 
   const handleCopy = useCallback(async (): Promise<void> => {
@@ -295,7 +297,7 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
   if (!hasMemory) {
     return (
       <div className="flex flex-1 items-center justify-center text-text-muted">
-        This project has no memory directory yet.
+        {t('memory.noMemoryDirectory')}
       </div>
     );
   }
@@ -311,11 +313,11 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
         }}
       >
         <div className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-          Layers {rows.length > 0 && <span>({rows.length})</span>}
+          {t('memory.layers')} {rows.length > 0 && <span>({rows.length})</span>}
         </div>
         <div className="flex-1 overflow-y-auto pb-2">
           {rows.length === 0 && (
-            <div className="px-3 py-2 text-xs text-text-muted">No memory layers yet</div>
+            <div className="px-3 py-2 text-xs text-text-muted">{t('memory.noLayers')}</div>
           )}
           {rows.map((row) => {
             const isActive = row.fileName === displayedFile;
@@ -342,7 +344,7 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
                 )}
                 {row.kind === 'orphan' && (
                   <span className="text-[10px] uppercase tracking-wider text-text-muted">
-                    Unlinked
+                    {t('memory.unlinked')}
                   </span>
                 )}
               </button>
@@ -361,7 +363,7 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
             <>
               <button
                 type="button"
-                aria-label={copiedAt === null ? 'Copy content' : 'Copied'}
+                aria-label={copiedAt === null ? t('memory.copyContent') : t('common.copied')}
                 onClick={(): void => {
                   void handleCopy();
                 }}
@@ -375,12 +377,12 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
                 {copiedAt === null ? (
                   <>
                     <Copy size={14} className="text-text-secondary" aria-hidden="true" />
-                    <span>Copy</span>
+                    <span>{t('common.copy')}</span>
                   </>
                 ) : (
                   <>
                     <Check size={14} className="text-text-secondary" aria-hidden="true" />
-                    <span>Copied</span>
+                    <span>{t('common.copied')}</span>
                   </>
                 )}
               </button>
@@ -390,9 +392,9 @@ export const MemoryView = ({ projectId }: MemoryViewProps): React.JSX.Element =>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {displayedFile === null ? (
-            <div className="text-text-muted">Select a layer to view its content.</div>
+            <div className="text-text-muted">{t('memory.selectLayerToView')}</div>
           ) : rendered === undefined ? (
-            <div className="text-text-muted">Loading…</div>
+            <div className="text-text-muted">{t('common.loading')}</div>
           ) : (
             <div className="max-w-3xl">
               {frontmatter && <FrontmatterCard frontmatter={frontmatter} />}

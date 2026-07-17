@@ -3,6 +3,7 @@
  * Used by both TriggerCard and AddTriggerForm.
  */
 
+import { useT } from '@renderer/i18n';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
 import type { PreviewResult } from '../types';
@@ -24,6 +25,7 @@ export const TriggerPreview = ({
   onViewSession,
   isFormContext = false,
 }: Readonly<TriggerPreviewProps>): React.JSX.Element => {
+  const t = useT();
   const isLoading = loading ?? previewResult?.loading;
 
   // Safeguard: ensure count is at least the errors array length (handles edge cases where totalCount is 0 but errors exist)
@@ -34,7 +36,9 @@ export const TriggerPreview = ({
   return (
     <div className="mt-4 border-t border-border pt-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs uppercase tracking-widest text-text-muted">Preview</span>
+        <span className="text-xs uppercase tracking-widest text-text-muted">
+          {t('settings.notifications.preview')}
+        </span>
         <button
           type={isFormContext ? 'button' : undefined}
           onClick={onTest}
@@ -44,10 +48,10 @@ export const TriggerPreview = ({
           {isLoading ? (
             <span className="flex items-center gap-1">
               <Loader2 className="size-3 animate-spin" />
-              Testing...
+              {t('settings.notifications.testing')}
             </span>
           ) : (
-            'Test Trigger'
+            t('settings.notifications.testTrigger')
           )}
         </button>
       </div>
@@ -55,19 +59,18 @@ export const TriggerPreview = ({
       {previewResult && !previewResult.loading && (
         <div className="space-y-2">
           <p className="text-sm text-text-secondary">
+            {t('settings.notifications.errorsDetectedPrefix')}
             <span className="font-medium text-indigo-400">
               {previewResult.truncated && effectiveCount >= 10_000 ? '10,000+' : effectiveCount}
-            </span>{' '}
-            errors would have been detected
+            </span>
+            {t('settings.notifications.errorsDetectedSuffix')}
           </p>
 
           {/* Truncation warning - only shown when timeout or count limit hit */}
           {previewResult.truncated && (
             <div className="flex items-center gap-2 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
               <AlertTriangle className="size-4 shrink-0" />
-              <span>
-                Search stopped early (timeout or count limit). Actual matches may be higher.
-              </span>
+              <span>{t('settings.notifications.truncatedWarning')}</span>
             </div>
           )}
 
@@ -88,13 +91,15 @@ export const TriggerPreview = ({
                 onClick={() => onViewSession(error)}
                 className="shrink-0 rounded px-2 py-1 text-indigo-400 transition-colors hover:bg-indigo-500/10"
               >
-                View Session
+                {t('settings.notifications.viewSession')}
               </button>
             </div>
           ))}
 
           {effectiveCount > 10 && (
-            <p className="text-xs text-text-muted">...and {effectiveCount - 10} more</p>
+            <p className="text-xs text-text-muted">
+              {t('settings.notifications.andMore', { count: effectiveCount - 10 })}
+            </p>
           )}
         </div>
       )}

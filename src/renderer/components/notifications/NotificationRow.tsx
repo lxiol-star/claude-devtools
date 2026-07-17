@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 
+import { useT } from '@renderer/i18n';
 import { getTriggerColorDef } from '@shared/constants/triggerColors';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowRight, Bot, Check, Trash2 } from 'lucide-react';
@@ -32,9 +33,10 @@ export const NotificationRow = ({
   onArchive,
   onDelete,
 }: Readonly<NotificationRowProps>): React.JSX.Element => {
+  const t = useT();
   const [isHovered, setIsHovered] = useState(false);
   const isUnread = !error.isRead;
-  const projectName = error.context?.projectName || 'Unknown Project';
+  const projectName = error.context?.projectName || t('notifications.unknownProject');
   const relativeTime = formatDistanceToNow(new Date(error.timestamp), {
     addSuffix: true,
   });
@@ -112,7 +114,7 @@ export const NotificationRow = ({
               }}
             >
               <Bot className="size-3" />
-              subagent
+              {t('notifications.subagent')}
             </span>
           )}
         </div>
@@ -160,6 +162,7 @@ const HoverActions = ({
   onDeleteClick,
   onNavigateClick,
 }: HoverActionsProps): React.JSX.Element => {
+  const t = useT();
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
 
   const getButtonStyle = (buttonId: string, isDelete = false): React.CSSProperties => ({
@@ -182,7 +185,7 @@ const HoverActions = ({
           onMouseLeave={() => setHoveredButton(null)}
           className="rounded p-1.5 transition-colors"
           style={getButtonStyle('archive')}
-          title="Mark as read"
+          title={t('notifications.markAsRead')}
         >
           <Check className="size-4" />
         </button>
@@ -194,7 +197,7 @@ const HoverActions = ({
         onMouseLeave={() => setHoveredButton(null)}
         className="rounded p-1.5 transition-colors"
         style={getButtonStyle('delete', true)}
-        title="Delete"
+        title={t('common.delete')}
       >
         <Trash2 className="size-4" />
       </button>
@@ -205,7 +208,7 @@ const HoverActions = ({
         onMouseLeave={() => setHoveredButton(null)}
         className="rounded p-1.5 transition-colors"
         style={getButtonStyle('navigate')}
-        title="View in session"
+        title={t('notifications.viewInSession')}
       >
         <ArrowRight className="size-4" />
       </button>

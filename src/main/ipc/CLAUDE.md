@@ -6,6 +6,7 @@ Domain-organized IPC request handlers for main process.
 ```
 ipc/
 ├── handlers.ts          # Initialization and registration
+├── aggregate.ts         # Cross-backend (multi-context) aggregate handlers
 ├── config.ts            # App configuration handlers
 ├── configValidation.ts  # Config input validation/sanitization
 ├── guards.ts            # IPC argument type guards

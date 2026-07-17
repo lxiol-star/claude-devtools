@@ -26,7 +26,13 @@ import { getFullResetState } from '../utils/stateResetHelpers';
 
 import type { AppState, SearchNavigationContext } from '../types';
 import type { PaneLayout } from '@renderer/types/panes';
-import type { OpenTabOptions, Tab, TabInput, TabNavigationRequest } from '@renderer/types/tabs';
+import type {
+  ComparisonSession,
+  OpenTabOptions,
+  Tab,
+  TabInput,
+  TabNavigationRequest,
+} from '@renderer/types/tabs';
 import type { StateCreator } from 'zustand';
 
 // =============================================================================
@@ -47,6 +53,8 @@ export interface TabSlice {
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   openDashboard: () => void;
+  openAnalytics: () => void;
+  openComparison: (sessions: ComparisonSession[]) => void;
   getActiveTab: () => Tab | null;
   isSessionOpen: (sessionId: string) => boolean;
   enqueueTabNavigation: (tabId: string, request: TabNavigationRequest) => void;
@@ -134,9 +142,15 @@ export const createTabSlice: StateCreator<AppState, [], [], TabSlice> = (set, ge
 
     // If opening a session tab, check for duplicates first (unless forceNewTab)
     if (tab.type === 'session' && tab.sessionId && !options?.forceNewTab) {
-      // Check across ALL panes for dedup
+      // Check across ALL panes for dedup. Identity includes the origin context
+      // so the same session id from two backends (aggregate mode) doesn't collide.
       const allTabs = getAllTabs(paneLayout);
-      const existing = findTabBySession(allTabs, tab.sessionId);
+      const existing = allTabs.find(
+        (t) =>
+          t.type === 'session' &&
+          t.sessionId === tab.sessionId &&
+          (t.contextId ?? null) === (tab.contextId ?? null)
+      );
       if (existing) {
         // Focus existing tab (which will also focus its pane)
         state.setActiveTab(existing.id);
@@ -314,7 +328,7 @@ export const createTabSlice: StateCreator<AppState, [], [], TabSlice> = (set, ge
               selectedAIGroup: cachedTabData.selectedAIGroup,
             });
           } else {
-            void get().fetchSessionDetail(foundWorktree, sessionId, tabId);
+            void get().fetchSessionDetail(foundWorktree, sessionId, tabId, tab.contextId);
           }
         }
         return;
@@ -350,7 +364,7 @@ export const createTabSlice: StateCreator<AppState, [], [], TabSlice> = (set, ge
               selectedAIGroup: cachedTabData.selectedAIGroup,
             });
           } else {
-            void get().fetchSessionDetail(project.id, sessionId, tabId);
+            void get().fetchSessionDetail(project.id, sessionId, tabId, tab.contextId);
           }
         }
         return;
@@ -369,6 +383,53 @@ export const createTabSlice: StateCreator<AppState, [], [], TabSlice> = (set, ge
       id: generateUUID(),
       type: 'dashboard',
       label: 'Dashboard',
+      createdAt: Date.now(),
+    };
+
+    const updatedPane = {
+      ...focusedPane,
+      tabs: [...focusedPane.tabs, newTab],
+      activeTabId: newTab.id,
+    };
+    const newLayout = updatePane(paneLayout, updatedPane);
+    set(syncFromLayout(newLayout));
+  },
+
+  // Open a new analytics tab in the focused pane
+  openAnalytics: () => {
+    const state = get();
+    const { paneLayout } = state;
+    const focusedPane = findPane(paneLayout, paneLayout.focusedPaneId);
+    if (!focusedPane) return;
+
+    const newTab: Tab = {
+      id: generateUUID(),
+      type: 'analytics',
+      label: 'Analytics',
+      createdAt: Date.now(),
+    };
+
+    const updatedPane = {
+      ...focusedPane,
+      tabs: [...focusedPane.tabs, newTab],
+      activeTabId: newTab.id,
+    };
+    const newLayout = updatePane(paneLayout, updatedPane);
+    set(syncFromLayout(newLayout));
+  },
+
+  // Open a new side-by-side comparison tab in the focused pane
+  openComparison: (sessions: ComparisonSession[]) => {
+    const state = get();
+    const { paneLayout } = state;
+    const focusedPane = findPane(paneLayout, paneLayout.focusedPaneId);
+    if (!focusedPane) return;
+
+    const newTab: Tab = {
+      id: generateUUID(),
+      type: 'comparison',
+      label: 'Comparison',
+      comparisonSessions: sessions,
       createdAt: Date.now(),
     };
 

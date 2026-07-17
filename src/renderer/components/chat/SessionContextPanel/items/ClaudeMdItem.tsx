@@ -5,6 +5,7 @@
 import React from 'react';
 
 import { CopyablePath } from '@renderer/components/common/CopyablePath';
+import { useT } from '@renderer/i18n';
 import { resolveAbsolutePath, shortenDisplayPath } from '@renderer/utils/pathDisplay';
 
 import { formatTokens } from '../utils/formatting';
@@ -23,6 +24,7 @@ export const ClaudeMdItem = ({
   projectRoot,
   onNavigateToTurn,
 }: Readonly<ClaudeMdItemProps>): React.ReactElement => {
+  const t = useT();
   const turnIndex = parseTurnIndex(injection.firstSeenInGroup);
   const isClickable = onNavigateToTurn && turnIndex >= 0;
   const displayPath = shortenDisplayPath(injection.path, projectRoot);
@@ -38,7 +40,7 @@ export const ClaudeMdItem = ({
       />
       <div className="mt-0.5 flex items-center gap-2">
         <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          ~{formatTokens(injection.estimatedTokens)} tokens
+          {t('chat.tokens', { count: formatTokens(injection.estimatedTokens) })}
         </span>
         {isClickable ? (
           <button
@@ -57,7 +59,7 @@ export const ClaudeMdItem = ({
             }}
             onClick={() => onNavigateToTurn(turnIndex)}
           >
-            @{formatFirstSeen(injection.firstSeenInGroup)}
+            @{formatFirstSeen(injection.firstSeenInGroup, t)}
           </button>
         ) : (
           <span
@@ -67,7 +69,7 @@ export const ClaudeMdItem = ({
               opacity: 0.7,
             }}
           >
-            @{formatFirstSeen(injection.firstSeenInGroup)}
+            @{formatFirstSeen(injection.firstSeenInGroup, t)}
           </span>
         )}
       </div>

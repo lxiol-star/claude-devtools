@@ -2,6 +2,8 @@
  * ModeSelector - Segmented control for selecting trigger mode - Linear style.
  */
 
+import { useT } from '@renderer/i18n';
+
 import { MODE_OPTIONS } from '../utils/constants';
 
 import type { TriggerMode } from '@renderer/types/data';
@@ -17,6 +19,8 @@ export const ModeSelector = ({
   onChange,
   disabled = false,
 }: Readonly<ModeSelectorProps>): React.JSX.Element => {
+  const t = useT();
+
   return (
     <div className="inline-flex gap-0.5 rounded-md bg-surface-raised p-0.5">
       {MODE_OPTIONS.map((mode) => {
@@ -36,7 +40,7 @@ export const ModeSelector = ({
             } ${disabled ? 'cursor-not-allowed opacity-50' : ''} `}
           >
             <Icon className="size-3.5" />
-            {mode.label}
+            {t(mode.labelKey)}
           </button>
         );
       })}

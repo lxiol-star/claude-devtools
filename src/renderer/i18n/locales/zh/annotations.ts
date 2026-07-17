@@ -1,0 +1,21 @@
+/** 会话标注（标签 + 评分 + 备注）中文文案。 */
+export const annotations: Record<string, string> = {
+  'annotations.rate': '评分',
+  'annotations.clearRating': '清除评分',
+  'annotations.tags': '标签',
+  'annotations.addTag': '添加标签',
+  'annotations.removeTag': '移除标签“{tag}”',
+  'annotations.addTagPrompt': '输入标签名称',
+  'annotations.note': '备注',
+  'annotations.editNote': '编辑备注',
+  'annotations.editNotePrompt': '为该会话输入备注',
+  'annotations.noNote': '暂无备注',
+  'annotations.filterLabel': '筛选',
+  'annotations.filterTitle': '按标签和评分筛选会话',
+  'annotations.filterClear': '清除筛选',
+  'annotations.filterMinScore': '至少 {score} 星',
+  'annotations.savedViews': '已保存视图',
+  'annotations.saveCurrentView': '保存当前',
+  'annotations.saveViewPrompt': '为该视图命名',
+  'annotations.deleteView': '删除视图“{name}”',
+};

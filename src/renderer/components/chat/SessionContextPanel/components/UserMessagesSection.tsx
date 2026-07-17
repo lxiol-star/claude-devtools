@@ -4,6 +4,8 @@
 
 import React from 'react';
 
+import { useT } from '@renderer/i18n';
+
 import { UserMessageItem } from '../items/UserMessageItem';
 
 import { CollapsibleSection } from './CollapsibleSection';
@@ -25,11 +27,13 @@ export const UserMessagesSection = ({
   onToggle,
   onNavigateToTurn,
 }: Readonly<UserMessagesSectionProps>): React.ReactElement | null => {
+  const t = useT();
+
   if (injections.length === 0) return null;
 
   return (
     <CollapsibleSection
-      title="User Messages"
+      title={t('chat.context.userMessages')}
       count={injections.length}
       tokenCount={tokenCount}
       isExpanded={isExpanded}

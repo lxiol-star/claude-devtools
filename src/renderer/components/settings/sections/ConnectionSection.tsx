@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@renderer/api';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { normalizeSshAuthMethod } from '@shared/types';
 import { Loader2, Monitor, Server, Wifi, WifiOff } from 'lucide-react';
@@ -27,12 +28,13 @@ import type {
   SshConnectionProfile,
 } from '@shared/types';
 
-const authMethodOptions: readonly { value: SshAuthMethod; label: string }[] = [
-  { value: 'sshConfig', label: 'SSH Config (recommended)' },
-  { value: 'password', label: 'Password' },
+const authMethodOptions: readonly { value: SshAuthMethod; labelKey: string }[] = [
+  { value: 'sshConfig', labelKey: 'settings.connection.authSshConfig' },
+  { value: 'password', labelKey: 'settings.connection.authPassword' },
 ];
 
 export const ConnectionSection = (): React.JSX.Element => {
+  const t = useT();
   const connectionState = useStore((s) => s.connectionState);
   const connectedHost = useStore((s) => s.connectedHost);
   const connectionError = useStore((s) => s.connectionError);
@@ -195,9 +197,9 @@ export const ConnectionSection = (): React.JSX.Element => {
 
   return (
     <div className="space-y-6">
-      <SettingsSectionHeader title="Remote Connection" />
+      <SettingsSectionHeader title={t('settings.connection.remoteConnection')} />
       <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-        Connect to a remote machine to view Claude Code sessions running there
+        {t('settings.connection.remoteConnectionDesc')}
       </p>
 
       {/* Connection Status */}
@@ -212,10 +214,10 @@ export const ConnectionSection = (): React.JSX.Element => {
           <Wifi className="size-4 text-green-400" />
           <div className="flex-1">
             <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-              Connected to {connectedHost}
+              {t('settings.connection.connectedTo', { host: connectedHost ?? '' })}
             </p>
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              Viewing remote sessions via SSH
+              {t('settings.connection.viewingRemote')}
             </p>
           </div>
           <button
@@ -226,7 +228,7 @@ export const ConnectionSection = (): React.JSX.Element => {
               color: 'var(--color-text-secondary)',
             }}
           >
-            Disconnect
+            {t('settings.connection.disconnect')}
           </button>
         </div>
       )}
@@ -241,13 +243,16 @@ export const ConnectionSection = (): React.JSX.Element => {
 
       {/* Mode indicator */}
       {!isConnected && (
-        <SettingRow label="Current Mode" description="Data source for session files">
+        <SettingRow
+          label={t('settings.connection.currentMode')}
+          description={t('settings.connection.currentModeDesc')}
+        >
           <div
             className="flex items-center gap-2 text-sm"
             style={{ color: 'var(--color-text-secondary)' }}
           >
             <Monitor className="size-4" />
-            <span>Local ({resolvedClaudeRootPath})</span>
+            <span>{t('settings.connection.localMode', { path: resolvedClaudeRootPath })}</span>
           </div>
         </SettingRow>
       )}
@@ -256,7 +261,7 @@ export const ConnectionSection = (): React.JSX.Element => {
       {!isConnected && savedProfiles.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-            Saved Profiles
+            {t('settings.connection.savedProfiles')}
           </h3>
           <div className="flex flex-wrap gap-2">
             {savedProfiles.map((profile) => {
@@ -294,7 +299,7 @@ export const ConnectionSection = (): React.JSX.Element => {
       {!isConnected && (
         <div className="space-y-4">
           <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-            SSH Connection
+            {t('settings.connection.sshConnection')}
           </h3>
 
           <div className="grid grid-cols-2 gap-3">
@@ -305,7 +310,7 @@ export const ConnectionSection = (): React.JSX.Element => {
                 className="mb-1 block text-xs"
                 style={{ color: 'var(--color-text-muted)' }}
               >
-                Host
+                {t('settings.connection.host')}
               </label>
               <input
                 id="ssh-host"
@@ -319,7 +324,7 @@ export const ConnectionSection = (): React.JSX.Element => {
                   clearProfileSelection();
                 }}
                 onFocus={() => setShowDropdown(true)}
-                placeholder="hostname or ssh config alias"
+                placeholder={t('settings.connection.hostPlaceholder')}
                 className={inputClass}
                 style={inputStyle}
               />
@@ -365,7 +370,7 @@ export const ConnectionSection = (): React.JSX.Element => {
                 className="mb-1 block text-xs"
                 style={{ color: 'var(--color-text-muted)' }}
               >
-                Port
+                {t('settings.connection.port')}
               </label>
               <input
                 id="ssh-port"
@@ -385,7 +390,7 @@ export const ConnectionSection = (): React.JSX.Element => {
               className="mb-1 block text-xs"
               style={{ color: 'var(--color-text-muted)' }}
             >
-              Username
+              {t('settings.connection.username')}
             </label>
             <input
               id="ssh-username"
@@ -404,11 +409,14 @@ export const ConnectionSection = (): React.JSX.Element => {
           <div>
             {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- SettingsSelect is a custom dropdown without a native control */}
             <label className="mb-1 block text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              Authentication
+              {t('settings.connection.authentication')}
             </label>
             <SettingsSelect
               value={authMethod}
-              options={authMethodOptions}
+              options={authMethodOptions.map((option) => ({
+                value: option.value,
+                label: t(option.labelKey),
+              }))}
               onChange={setAuthMethod}
               fullWidth
             />
@@ -416,10 +424,15 @@ export const ConnectionSection = (): React.JSX.Element => {
 
           {authMethod === 'sshConfig' && (
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              Uses your <code>~/.ssh/config</code> exactly like <code>ssh {host || '<host>'}</code>{' '}
-              from a terminal (IdentityFile, IdentityAgent, agent forwarding all honored). Add an{' '}
-              <code>IdentityFile</code> to the host&apos;s config block, or run <code>ssh-add</code>
-              , if connection fails.
+              {t('settings.connection.sshConfigHelp1')}
+              <code>~/.ssh/config</code>
+              {t('settings.connection.sshConfigHelp2')}
+              <code>ssh {host || '<host>'}</code>
+              {t('settings.connection.sshConfigHelp3')}
+              <code>IdentityFile</code>
+              {t('settings.connection.sshConfigHelp4')}
+              <code>ssh-add</code>
+              {t('settings.connection.sshConfigHelp5')}
             </p>
           )}
 
@@ -430,7 +443,7 @@ export const ConnectionSection = (): React.JSX.Element => {
                 className="mb-1 block text-xs"
                 style={{ color: 'var(--color-text-muted)' }}
               >
-                Password
+                {t('settings.connection.authPassword')}
               </label>
               <input
                 id="ssh-password"
@@ -453,8 +466,10 @@ export const ConnectionSection = (): React.JSX.Element => {
               }`}
             >
               {testResult.success
-                ? 'Connection successful'
-                : `Connection failed: ${testResult.error ?? 'Unknown error'}`}
+                ? t('settings.connection.testSuccess')
+                : t('settings.connection.testFailed', {
+                    error: testResult.error ?? t('settings.connection.unknownError'),
+                  })}
             </div>
           )}
 
@@ -472,10 +487,10 @@ export const ConnectionSection = (): React.JSX.Element => {
               {testing ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="size-3 animate-spin" />
-                  Testing...
+                  {t('settings.connection.testing')}
                 </span>
               ) : (
-                'Test Connection'
+                t('settings.connection.testConnection')
               )}
             </button>
 
@@ -491,12 +506,12 @@ export const ConnectionSection = (): React.JSX.Element => {
               {isConnecting ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="size-3 animate-spin" />
-                  Connecting...
+                  {t('settings.connection.connecting')}
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
                   <WifiOff className="size-3" />
-                  Connect
+                  {t('settings.connection.connect')}
                 </span>
               )}
             </button>

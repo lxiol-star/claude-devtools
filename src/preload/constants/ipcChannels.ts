@@ -80,6 +80,18 @@ export const CONFIG_HIDE_SESSIONS = 'config:hideSessions';
 /** Bulk unhide sessions */
 export const CONFIG_UNHIDE_SESSIONS = 'config:unhideSessions';
 
+/** Set (merge) a session annotation */
+export const CONFIG_SET_SESSION_ANNOTATION = 'config:setSessionAnnotation';
+
+/** Remove a session annotation */
+export const CONFIG_REMOVE_SESSION_ANNOTATION = 'config:removeSessionAnnotation';
+
+/** Add a saved view (named filter preset) */
+export const CONFIG_ADD_SAVED_VIEW = 'config:addSavedView';
+
+/** Remove a saved view */
+export const CONFIG_REMOVE_SAVED_VIEW = 'config:removeSavedView';
+
 // =============================================================================
 // SSH API Channels
 // =============================================================================
@@ -143,6 +155,9 @@ export const CONTEXT_SWITCH = 'context:switch';
 /** Context changed event channel (main -> renderer) */
 export const CONTEXT_CHANGED = 'context:changed';
 
+/** Context-tagged file change event (main -> renderer), payload: { contextId, event } */
+export const CONTEXT_FILE_CHANGE = 'context-file-change';
+
 // =============================================================================
 // HTTP Server API Channels
 // =============================================================================
@@ -184,6 +199,28 @@ export const SESSION_REFRESH = 'session:refresh';
 
 /** Find a session by its exact UUID across all projects */
 export const FIND_SESSION_BY_ID = 'find-session-by-id';
+
+// =============================================================================
+// Aggregate (Cross-Backend) API Channels
+// =============================================================================
+
+/** List projects merged across all local backend contexts */
+export const GET_ALL_PROJECTS = 'get-all-projects';
+
+/** List repository groups merged across all local backend contexts */
+export const GET_ALL_REPOSITORY_GROUPS = 'get-all-repository-groups';
+
+/** List sessions for a project across all local backend contexts */
+export const GET_ALL_SESSIONS = 'get-all-sessions';
+
+/** Get full session detail from a specific service context */
+export const GET_SESSION_DETAIL_BY_CONTEXT = 'get-session-detail-by-context';
+
+/** Get the execution timeline (waterfall) from a specific service context */
+export const GET_WATERFALL_DATA_BY_CONTEXT = 'get-waterfall-data-by-context';
+
+/** Compute cross-session aggregate metrics across all local backend contexts */
+export const GET_AGGREGATE_METRICS = 'get-aggregate-metrics';
 
 // =============================================================================
 // Memory API Channels

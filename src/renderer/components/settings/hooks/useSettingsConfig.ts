@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { api } from '@renderer/api';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -81,6 +82,7 @@ export function useSettingsConfig(): UseSettingsConfigReturn {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   // Local optimistic state for immediate visual feedback on toggles
   const [optimisticConfig, setOptimisticConfig] = useState<AppConfig | null>(null);
@@ -95,13 +97,14 @@ export function useSettingsConfig(): UseSettingsConfigReturn {
         setConfig(loadedConfig);
         setOptimisticConfig(loadedConfig);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load settings');
+        setError(err instanceof Error ? err.message : t('settings.loadError'));
       } finally {
         setLoading(false);
       }
     };
 
     void loadConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time load on mount; t only affects the fallback message
   }, []);
 
   // Fetch repository groups for ignored repositories dropdown
@@ -136,12 +139,12 @@ export function useSettingsConfig(): UseSettingsConfigReturn {
       } catch (err) {
         // Revert optimistic update on error
         setOptimisticConfig(config);
-        setError(err instanceof Error ? err.message : 'Failed to save settings');
+        setError(err instanceof Error ? err.message : t('settings.saveError'));
       } finally {
         setSaving(false);
       }
     },
-    [config]
+    [config, t]
   );
 
   // Use optimistic config for UI display (falls back to config if not set)

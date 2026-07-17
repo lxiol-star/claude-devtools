@@ -30,3 +30,7 @@ Handlers in `ipc/` by domain:
 ## File Watching
 FileWatcher service monitors session files with 100ms debounce.
 Notifies renderer of changes via IPC events.
+All local-type contexts (primary `local` + secondary `local-{backend}`) keep
+their watchers running even while inactive; only SSH contexts pause on switch.
+The active context's events use `file-change`; inactive local contexts forward
+`{ contextId, event }` on `context-file-change` for the aggregate "All" view.

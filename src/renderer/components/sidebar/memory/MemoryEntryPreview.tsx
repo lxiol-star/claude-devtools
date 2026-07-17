@@ -8,6 +8,7 @@
 import ReactMarkdown from 'react-markdown';
 
 import { markdownComponents } from '@renderer/components/chat/markdownComponents';
+import { useT } from '@renderer/i18n';
 import remarkGfm from 'remark-gfm';
 
 interface MemoryEntryPreviewProps {
@@ -15,8 +16,10 @@ interface MemoryEntryPreviewProps {
 }
 
 export const MemoryEntryPreview = ({ content }: MemoryEntryPreviewProps): React.JSX.Element => {
+  const t = useT();
+
   if (content === undefined) {
-    return <div className="px-2 py-1 text-xs text-text-muted">Loading…</div>;
+    return <div className="px-2 py-1 text-xs text-text-muted">{t('common.loading')}</div>;
   }
 
   return (

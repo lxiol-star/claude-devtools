@@ -8,13 +8,13 @@ import type { ModeConfig } from '../types';
 import type { TriggerContentType, TriggerToolName } from '@renderer/types/data';
 
 /**
- * Content type options for dropdown.
+ * Content type options for dropdown (labels resolved via i18n at render time).
  */
-export const CONTENT_TYPE_OPTIONS: { value: TriggerContentType; label: string }[] = [
-  { value: 'tool_result', label: 'Tool Result' },
-  { value: 'tool_use', label: 'Tool Use' },
-  { value: 'thinking', label: 'Thinking' },
-  { value: 'text', label: 'Text Output' },
+export const CONTENT_TYPE_OPTIONS: { value: TriggerContentType; labelKey: string }[] = [
+  { value: 'tool_result', labelKey: 'settings.notifications.contentType.toolResult' },
+  { value: 'tool_use', labelKey: 'settings.notifications.contentType.toolUse' },
+  { value: 'thinking', labelKey: 'settings.notifications.contentType.thinking' },
+  { value: 'text', labelKey: 'settings.notifications.contentType.text' },
 ];
 
 /**
@@ -41,10 +41,14 @@ export const TOOL_NAME_OPTIONS: { value: TriggerToolName; label: string }[] = [
 ];
 
 /**
- * Mode options for the trigger mode selector.
+ * Mode options for the trigger mode selector (labels resolved via i18n at render time).
  */
 export const MODE_OPTIONS: ModeConfig[] = [
-  { value: 'error_status', label: 'Execution Error', icon: AlertCircle },
-  { value: 'content_match', label: 'Content Pattern', icon: Search },
-  { value: 'token_threshold', label: 'High Token Usage', icon: Activity },
+  { value: 'error_status', labelKey: 'settings.notifications.mode.errorStatus', icon: AlertCircle },
+  { value: 'content_match', labelKey: 'settings.notifications.mode.contentMatch', icon: Search },
+  {
+    value: 'token_threshold',
+    labelKey: 'settings.notifications.mode.tokenThreshold',
+    icon: Activity,
+  },
 ];

@@ -7,6 +7,8 @@ import { createLogger } from '@shared/utils/logger';
 
 import { getSessionResetState } from '../utils/stateResetHelpers';
 
+import { isAggregateSourceMode } from './contextSlice';
+
 import type { AppState } from '../types';
 import type { RepositoryGroup } from '@renderer/types/data';
 import type { StateCreator } from 'zustand';
@@ -53,7 +55,10 @@ export const createRepositorySlice: StateCreator<AppState, [], [], RepositorySli
   fetchRepositoryGroups: async () => {
     set({ repositoryGroupsLoading: true, repositoryGroupsError: null });
     try {
-      const groups = await api.getRepositoryGroups();
+      // Aggregate ("All") mode merges groups across all local backends.
+      const groups = isAggregateSourceMode(get())
+        ? await api.getAllRepositoryGroups()
+        : await api.getRepositoryGroups();
       // Already sorted by most recent session in the scanner
       set({ repositoryGroups: groups, repositoryGroupsLoading: false });
     } catch (error) {

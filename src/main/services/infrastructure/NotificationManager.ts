@@ -13,13 +13,14 @@
  */
 
 import { createLogger } from '@shared/utils/logger';
-import { type BrowserWindow, Notification } from 'electron';
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
 import { type DetectedError } from '../error/ErrorMessageBuilder';
+
+import type { BrowserWindow, Notification as ElectronNotification } from 'electron';
 
 const logger = createLogger('Service:NotificationManager');
 import { projectPathResolver } from '../discovery/ProjectPathResolver';
@@ -374,10 +375,11 @@ export class NotificationManager extends EventEmitter {
    */
   private showNativeNotification(error: DetectedError): void {
     // Guard against standalone/Docker mode where Electron's Notification API is unavailable
+    const NotificationCtor = getElectronNotification();
     if (
-      typeof Notification === 'undefined' ||
-      typeof Notification.isSupported !== 'function' ||
-      !Notification.isSupported()
+      !NotificationCtor ||
+      typeof NotificationCtor.isSupported !== 'function' ||
+      !NotificationCtor.isSupported()
     ) {
       logger.warn('Native notifications not supported');
       return;
@@ -385,7 +387,7 @@ export class NotificationManager extends EventEmitter {
 
     const config = this.configManager.getConfig();
 
-    const notification = new Notification({
+    const notification = new NotificationCtor({
       title: 'Claude Code Error',
       subtitle: error.context.projectName,
       body: error.message.slice(0, 200),
@@ -653,5 +655,20 @@ export class NotificationManager extends EventEmitter {
       byProject,
       bySource,
     };
+  }
+}
+
+/**
+ * Lazily loads Electron's Notification class. Returns null when running
+ * outside Electron (e.g. standalone/Docker mode).
+ */
+function getElectronNotification(): typeof ElectronNotification | null {
+  try {
+     
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- dynamic require to avoid Electron import in standalone mode
+    const electron = require('electron') as { Notification?: typeof ElectronNotification };
+    return electron.Notification ?? null;
+  } catch {
+    return null;
   }
 }

@@ -2,6 +2,8 @@
  * GeneralInfoSection - Name input and tool select for AddTriggerForm.
  */
 
+import { useT } from '@renderer/i18n';
+
 import { TOOL_NAME_OPTIONS } from '../utils/constants';
 
 import { SectionHeader } from './SectionHeader';
@@ -21,15 +23,17 @@ export const GeneralInfoSection = ({
   onNameChange,
   onToolNameChange,
 }: Readonly<GeneralInfoSectionProps>): React.JSX.Element => {
+  const t = useT();
+
   return (
     <div className="space-y-3">
-      <SectionHeader title="General Info" />
+      <SectionHeader title={t('settings.notifications.generalInfo')} />
 
       {/* Trigger Name */}
       <div className="border-b border-border-subtle py-2">
         <div className="mb-2 flex items-center justify-between">
           <label htmlFor="new-trigger-name" className="text-sm text-text-secondary">
-            Trigger Name *
+            {t('settings.notifications.triggerName')} *
           </label>
         </div>
         <input
@@ -37,7 +41,7 @@ export const GeneralInfoSection = ({
           type="text"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="e.g., Build Failure Alert"
+          placeholder={t('settings.notifications.triggerNamePlaceholder')}
           disabled={saving}
           required
           className={`w-full rounded border border-border bg-transparent px-2 py-1.5 text-sm text-text placeholder:text-text-muted focus:border-transparent focus:outline-none focus:ring-1 focus:ring-indigo-500 ${saving ? 'cursor-not-allowed opacity-50' : ''} `}
@@ -47,7 +51,7 @@ export const GeneralInfoSection = ({
       {/* Scope/Tool Name */}
       <div className="flex items-center justify-between border-b border-border-subtle py-2">
         <label htmlFor="new-trigger-tool-name" className="text-sm text-text-secondary">
-          Scope / Tool Name (optional)
+          {t('settings.notifications.scopeToolNameOptional')}
         </label>
         <select
           id="new-trigger-tool-name"
@@ -58,7 +62,7 @@ export const GeneralInfoSection = ({
         >
           {TOOL_NAME_OPTIONS.map((option) => (
             <option key={option.value} value={option.value} className="bg-[#141416]">
-              {option.label}
+              {option.value === '' ? t('settings.notifications.anyTool') : option.label}
             </option>
           ))}
         </select>

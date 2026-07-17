@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, isElectronMode } from '@renderer/api';
 import appIcon from '@renderer/favicon.png';
+import { useT } from '@renderer/i18n';
 import { useStore } from '@renderer/store';
 import { CheckCircle, Code2, Download, Loader2, RefreshCw, Upload } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export const AdvancedSection = ({
   onImportConfig,
   onOpenInEditor,
 }: AdvancedSectionProps): React.JSX.Element => {
+  const t = useT();
   const isElectron = useMemo(() => isElectronMode(), []);
   const [version, setVersion] = useState<string>('');
   const updateStatus = useStore((s) => s.updateStatus);
@@ -59,14 +61,14 @@ export const AdvancedSection = ({
         return (
           <>
             <Loader2 className="size-3.5 animate-spin" />
-            Checking...
+            {t('settings.advanced.checking')}
           </>
         );
       case 'not-available':
         return (
           <>
             <CheckCircle className="size-3.5" />
-            Up to date
+            {t('settings.advanced.upToDate')}
           </>
         );
       case 'available':
@@ -75,15 +77,17 @@ export const AdvancedSection = ({
           <>
             <Download className="size-3.5" />
             {updateStatus === 'downloaded'
-              ? 'Update ready'
-              : `v${availableVersion ?? 'unknown'} available`}
+              ? t('settings.advanced.updateReady')
+              : t('settings.advanced.versionAvailable', {
+                  version: availableVersion ?? t('common.unknown'),
+                })}
           </>
         );
       default:
         return (
           <>
             <RefreshCw className="size-3.5" />
-            Check for Updates
+            {t('settings.advanced.checkForUpdates')}
           </>
         );
     }
@@ -91,7 +95,7 @@ export const AdvancedSection = ({
 
   return (
     <div>
-      <SettingsSectionHeader title="Configuration" />
+      <SettingsSectionHeader title={t('settings.advanced.configuration')} />
       <div className="space-y-2 py-2">
         <button
           onClick={onResetToDefaults}
@@ -103,7 +107,7 @@ export const AdvancedSection = ({
           }}
         >
           <RefreshCw className="size-4" />
-          Reset to Defaults
+          {t('settings.advanced.resetToDefaults')}
         </button>
         <button
           onClick={onExportConfig}
@@ -115,7 +119,7 @@ export const AdvancedSection = ({
           }}
         >
           <Download className="size-4" />
-          Export Config
+          {t('settings.advanced.exportConfig')}
         </button>
         <button
           onClick={onImportConfig}
@@ -127,7 +131,7 @@ export const AdvancedSection = ({
           }}
         >
           <Upload className="size-4" />
-          Import Config
+          {t('settings.advanced.importConfig')}
         </button>
         {isElectron && (
           <button
@@ -139,14 +143,14 @@ export const AdvancedSection = ({
             }}
           >
             <Code2 className="size-4" />
-            Open in Editor
+            {t('settings.advanced.openInEditor')}
           </button>
         )}
       </div>
 
-      <SettingsSectionHeader title="About" />
+      <SettingsSectionHeader title={t('settings.advanced.about')} />
       <div className="flex items-start gap-4 py-3">
-        <img src={appIcon} alt="App Icon" className="size-10 rounded-lg" />
+        <img src={appIcon} alt={t('settings.advanced.appIconAlt')} className="size-10 rounded-lg" />
         <div>
           <div className="flex items-center gap-3">
             <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
@@ -178,16 +182,14 @@ export const AdvancedSection = ({
                   color: 'var(--color-text-muted)',
                 }}
               >
-                Standalone
-              </span>
-            )}
+                {t('settings.advanced.standalone')}
+              </span>            )}
           </div>
           <p className="mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            Version {version || '...'}
+            {t('settings.advanced.version', { version: version || '...' })}
           </p>
           <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
-            Visualize and analyze Claude Code session executions with interactive waterfall charts
-            and detailed insights.
+            {t('settings.advanced.description')}
           </p>
         </div>
       </div>

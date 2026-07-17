@@ -6,6 +6,8 @@
 
 import React from 'react';
 
+import { useT } from '@renderer/i18n';
+
 import { type ItemStatus } from '../BaseItem';
 
 import { CollapsibleOutputSection } from './CollapsibleOutputSection';
@@ -19,12 +21,14 @@ interface DefaultToolViewerProps {
 }
 
 export const DefaultToolViewer: React.FC<DefaultToolViewerProps> = ({ linkedTool, status }) => {
+  const t = useT();
+
   return (
     <>
       {/* Input Section */}
       <div>
         <div className="mb-1 text-xs" style={{ color: 'var(--tool-item-muted)' }}>
-          Input
+          {t('chat.input')}
         </div>
         <div
           className="max-h-96 overflow-auto rounded p-3 font-mono text-xs"
@@ -34,7 +38,7 @@ export const DefaultToolViewer: React.FC<DefaultToolViewerProps> = ({ linkedTool
             color: 'var(--color-text-secondary)',
           }}
         >
-          {renderInput(linkedTool.name, linkedTool.input)}
+          {renderInput(linkedTool.name, linkedTool.input, t)}
         </div>
       </div>
 

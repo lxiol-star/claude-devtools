@@ -51,7 +51,7 @@ export function validateProjectId(projectId: unknown): ValidationResult<string> 
   }
 
   if (!isValidProjectId(basic.value!)) {
-    return { valid: false, error: 'projectId is not a valid encoded Claude project path' };
+    return { valid: false, error: 'projectId is not a valid encoded project path' };
   }
 
   return { valid: true, value: basic.value };
